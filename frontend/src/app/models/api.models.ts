@@ -46,7 +46,7 @@ export interface WSMessage {
 }
 
 export interface WSInitMessage extends WSMessage {
-  type: 'init';
+  type: 'auth';
   userId?: string;
 }
 

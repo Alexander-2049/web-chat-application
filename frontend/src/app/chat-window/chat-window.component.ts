@@ -127,8 +127,8 @@ export class ChatWindowComponent
     return currentMsg.userId !== previousMsg.userId;
   }
 
-  isOwnMessage(message: Message): boolean {
-    const currentUserId = this.userService.getUserId();
+  async isOwnMessage(message: Message): Promise<boolean> {
+    const currentUserId = await this.userService.getUserId();
     return message.userId === currentUserId;
   }
 

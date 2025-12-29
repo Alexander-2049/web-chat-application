@@ -17,6 +17,7 @@ type ClientConnection = {
 
 export class ChatServer {
   private wss?: WebSocketServer;
+  private unauthorizedClients: WebSocket[] = [];
   private clients = new Map<string, ClientConnection>();
   private roomParticipants = new Map<number, Set<string>>();
   private roomLastActivity = new Map<number, number>();
@@ -44,14 +45,61 @@ export class ChatServer {
   }
 
   private onConnection(ws: WebSocket) {
-    const userId = uuidv4();
-    const conn: ClientConnection = { userId, ws, user: null, rooms: new Set() };
-    this.clients.set(userId, conn);
-    ws.send(JSON.stringify({ type: "welcome", userId }));
+    let conn: ClientConnection | null = null;
+
+    // Set a 5-second auth timeout
+    const authTimeout = setTimeout(() => {
+      if (!conn) {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            code: "AUTH_TIMEOUT",
+            reason: "Authentication required within 5 seconds",
+          })
+        );
+        ws.close();
+      }
+    }, 5000);
 
     ws.on("message", (data) => {
       try {
         const msg = JSON.parse(data.toString());
+
+        // First message must be "auth"
+        if (!conn) {
+          if (msg.type !== "auth" || typeof msg.userId !== "string") {
+            return ws.send(
+              JSON.stringify({
+                type: "error",
+                code: "UNAUTHORIZED",
+                reason: "First message must be 'auth' with a valid userId",
+              })
+            );
+          }
+
+          // Check if another live connection exists
+          const existing = this.clients.get(msg.userId);
+          if (existing && existing.ws.readyState === WebSocket.OPEN) {
+            return ws.send(
+              JSON.stringify({
+                type: "error",
+                code: "DUPLICATE_CONNECTION",
+                reason: "Only 1 connection can be established at a time",
+              })
+            );
+          }
+
+          // Authorize connection
+          clearTimeout(authTimeout); // Cancel timeout
+          const user = this.userRepo.findById(msg.userId) ?? null;
+          conn = { userId: msg.userId, ws, user, rooms: new Set() };
+          this.clients.set(msg.userId, conn);
+
+          ws.send(JSON.stringify({ type: "auth_ok", userId: msg.userId }));
+          return;
+        }
+
+        // Already authorized → normal message flow
         this.handleMessage(conn, msg);
       } catch (err) {
         ws.send(JSON.stringify({ type: "error", error: "Invalid JSON" }));
@@ -59,6 +107,8 @@ export class ChatServer {
     });
 
     ws.on("close", () => {
+      clearTimeout(authTimeout); // Ensure timeout is cleared
+      if (!conn) return;
       this.onClose(conn);
     });
   }

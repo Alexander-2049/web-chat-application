@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, type Observable } from 'rxjs';
+import { API_CONFIG } from '../config/api.config';
 
 export interface User {
   userId: string;
@@ -48,11 +49,19 @@ export class UserService {
     return this.currentUserSubject.value;
   }
 
-  getUserId(): string | null {
+  async getUserId(): Promise<string> {
     let userId = localStorage.getItem('userId');
     if (!userId) {
-      userId = Math.random().toString() + Math.random().toString();
-      localStorage.setItem('userId', userId);
+      const response = await fetch(
+        API_CONFIG.BASE_URL + '/api/profile/generateUserId'
+      );
+      const obj = (await response.json()) as Record<string, unknown>;
+      if ('userId' in obj && typeof obj['userId'] === 'string') {
+        userId = obj['userId'];
+        localStorage.setItem('userId', userId);
+      } else {
+        throw new Error('Server sent wrong data');
+      }
     }
 
     return this.currentUserSubject.value?.userId || userId;

@@ -39,15 +39,11 @@ export class RoomsComponent implements OnInit, OnDestroy {
     private userService: UserService
   ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     this.loadRooms();
 
-    this.wsService.connect();
-
-    const userId = this.userService.getUserId();
-    if (userId) {
-      this.wsService.sendInit(userId);
-    }
+    const userId = await this.userService.getUserId();
+    this.wsService.connect(userId);
 
     const roomUpdateSub = this.wsService
       .getMessagesOfType<any>('roomsListUpdate')
@@ -107,7 +103,7 @@ export class RoomsComponent implements OnInit, OnDestroy {
     }
   }
 
-  createRoom() {
+  async createRoom() {
     console.log('createRoom triggered');
     const roomName = this.headForm.get('searchCreateInputBar')?.value;
     if (!roomName || roomName.trim() === '') {
@@ -115,7 +111,7 @@ export class RoomsComponent implements OnInit, OnDestroy {
     }
     console.log('createRoom roomName: ' + roomName);
 
-    const userId = this.userService.getUserId();
+    const userId = await this.userService.getUserId();
     if (!userId) {
       this.errorMessage = 'User not found';
       return;

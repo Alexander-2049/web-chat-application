@@ -3,7 +3,7 @@ import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { API_CONFIG } from '../config/api.config';
 import type {
   WSMessage,
-  WSInitMessage,
+  WSInitMessage as WSAuthMessage,
   WSProfileMessage,
   WSJoinMessage,
   WSLeaveMessage,
@@ -25,7 +25,7 @@ export class WebSocketService {
 
   constructor() {}
 
-  connect(): void {
+  connect(userId: string): void {
     if (this.socket?.readyState === WebSocket.OPEN) {
       console.log('[v0] WebSocket already connected');
       return;
@@ -35,6 +35,11 @@ export class WebSocketService {
 
     this.socket.onopen = () => {
       console.log('[v0] WebSocket connected');
+      const message: WSAuthMessage = {
+        type: 'auth',
+        userId,
+      };
+      this.send(message);
       this.connectionStatus.next(true);
     };
 
@@ -76,11 +81,12 @@ export class WebSocketService {
   }
 
   // Client to server messages
-  sendInit(userId?: string): void {
-    const message: WSInitMessage = {
-      type: 'init',
-      ...(userId && { userId }),
+  sendAuth(userId: string): void {
+    const message: WSAuthMessage = {
+      type: 'auth',
+      userId,
     };
+
     this.send(message);
   }
 

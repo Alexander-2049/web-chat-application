@@ -85,4 +85,9 @@ export function setupProfileRoutes(app: Application, userRepo: UserRepository) {
       res.status(500).json({ error: String(err?.message || err) });
     }
   });
+
+  app.get("/api/profile/generateUserId", (req: Request, res: Response) => {
+    const userId = uuidv4();
+    res.json({ userId });
+  });
 }

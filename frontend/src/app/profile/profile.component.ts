@@ -91,24 +91,23 @@ export class ProfileComponent implements OnInit {
     this.errorMessage = '';
 
     try {
-      let userId = this.userService.getUserId();
+      let userId = await this.userService.getUserId();
 
-      // If no userId, connect to WebSocket to get one
-      if (!userId) {
-        this.wsService.connect();
-
-        // Wait for welcome message with userId
-        await new Promise<void>((resolve) => {
-          const sub = this.wsService
-            .getMessagesOfType<any>('welcome')
-            .subscribe((msg) => {
-              userId = msg.userId;
-              localStorage.setItem('userId', userId || '');
-              sub.unsubscribe();
-              resolve();
-            });
-        });
+      if (!this.wsService.isConnected$) {
+        this.wsService.connect(userId);
       }
+
+      // Wait for welcome message with userId
+      await new Promise<void>((resolve) => {
+        const sub = this.wsService
+          .getMessagesOfType<any>('welcome')
+          .subscribe((msg) => {
+            userId = msg.userId;
+            localStorage.setItem('userId', userId || '');
+            sub.unsubscribe();
+            resolve();
+          });
+      });
 
       let avatarPath = this.avatarImage || '';
 
