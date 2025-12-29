@@ -19,12 +19,14 @@ export class ChatServer {
   private wss?: WebSocketServer;
   private clients = new Map<string, ClientConnection>();
   private roomParticipants = new Map<number, Set<string>>();
+  private roomLastActivity = new Map<number, number>();
 
   constructor(
     private server: HttpServer,
     private userRepo: UserRepository,
     private roomRepo: RoomRepository,
-    private msgRepo: MessageRepository
+    private msgRepo: MessageRepository,
+    private chatLifeDurationSeconds: number = 60 * 10 // 10 minutes
   ) {}
 
   setup() {
@@ -64,15 +66,10 @@ export class ChatServer {
   private onClose(conn: ClientConnection) {
     // remove from rooms
     for (const roomId of conn.rooms) {
-      const set = this.roomParticipants.get(roomId);
-      if (set) {
-        set.delete(conn.userId);
-        this.notifyRoomCount(roomId, set.size);
-        if (set.size === 0) {
-          this.roomRepo.archive(roomId);
-          this.broadcastRoomDeleted(roomId);
-          this.broadcastRoomsList();
-        }
+      const participants = this.roomParticipants.get(roomId);
+      if (participants) {
+        participants.delete(conn.userId);
+        this.notifyRoomCount(roomId, participants.size);
       }
     }
     // mark user disconnected
@@ -133,34 +130,29 @@ export class ChatServer {
         return ws.send(
           JSON.stringify({ type: "error", error: "room not found or archived" })
         );
-      let set = this.roomParticipants.get(roomId);
-      if (!set) {
-        set = new Set();
-        this.roomParticipants.set(roomId, set);
+      let participants = this.roomParticipants.get(roomId);
+      if (!participants) {
+        participants = new Set();
+        this.roomParticipants.set(roomId, participants);
       }
-      set.add(conn.userId);
+      participants.add(conn.userId);
       conn.rooms.add(roomId);
 
       const messages = this.msgRepo.findLastN(roomId, 100);
       ws.send(JSON.stringify({ type: "history", messages }));
 
-      this.notifyRoomCount(roomId, set.size);
+      this.notifyRoomCount(roomId, participants.size);
       this.broadcastRoomsList();
       return;
     }
 
     if (msg.type === "leave") {
       const roomId = Number(msg.roomId);
-      const set = this.roomParticipants.get(roomId);
-      if (set) {
-        set.delete(conn.userId);
+      const participants = this.roomParticipants.get(roomId);
+      if (participants) {
+        participants.delete(conn.userId);
         conn.rooms.delete(roomId);
-        this.notifyRoomCount(roomId, set.size);
-        if (set.size === 0) {
-          this.roomRepo.archive(roomId);
-          this.broadcastRoomDeleted(roomId);
-          this.broadcastRoomsList();
-        }
+        this.notifyRoomCount(roomId, participants.size);
       }
       return;
     }
@@ -192,10 +184,10 @@ export class ChatServer {
       );
       this.msgRepo.save(message);
 
-      const set = this.roomParticipants.get(roomId);
-      if (set) {
+      const participants = this.roomParticipants.get(roomId);
+      if (participants) {
         const payload = JSON.stringify({ type: "message", message });
-        for (const uid of set) {
+        for (const uid of participants) {
           const c = this.clients.get(uid);
           if (c && c.ws.readyState === WebSocket.OPEN) c.ws.send(payload);
         }
