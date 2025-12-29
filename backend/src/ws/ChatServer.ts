@@ -3,7 +3,6 @@ import WebSocket, { WebSocketServer } from "ws";
 import { UserRepository } from "../storage/UserRepository";
 import { RoomRepository } from "../storage/RoomRepository";
 import { MessageRepository } from "../storage/MessageRepository";
-import { v4 as uuidv4 } from "uuid";
 import escapeHtml from "escape-html";
 import { User } from "../models/User";
 import { Message } from "../models/Message";
@@ -17,7 +16,6 @@ type ClientConnection = {
 
 export class ChatServer {
   private wss?: WebSocketServer;
-  private unauthorizedClients: WebSocket[] = [];
   private clients = new Map<string, ClientConnection>();
   private roomParticipants = new Map<number, Set<string>>();
   private roomLastActivity = new Map<number, number>();
@@ -27,27 +25,20 @@ export class ChatServer {
     private userRepo: UserRepository,
     private roomRepo: RoomRepository,
     private msgRepo: MessageRepository,
-    private chatLifeDurationSeconds: number = 60 * 10 // 10 minutes
+    private chatLifeDurationSeconds: number = 120
   ) {}
 
   setup() {
     this.wss = new WebSocketServer({ server: this.server, path: "/ws/chat" });
     this.wss.on("connection", (ws) => this.onConnection(ws));
+    this.startRoomCleanupLoop();
   }
 
-  private broadcastRoomsList() {
-    if (!this.wss) return;
-    const rooms = this.roomRepo.findActivePublic();
-    const payload = JSON.stringify({ type: "roomsListUpdate", rooms });
-    for (const client of this.wss.clients) {
-      if (client.readyState === WebSocket.OPEN) client.send(payload);
-    }
-  }
+  /* ---------------------- CONNECTION / AUTH ---------------------- */
 
   private onConnection(ws: WebSocket) {
     let conn: ClientConnection | null = null;
 
-    // Set a 5-second auth timeout
     const authTimeout = setTimeout(() => {
       if (!conn) {
         ws.send(
@@ -65,19 +56,18 @@ export class ChatServer {
       try {
         const msg = JSON.parse(data.toString());
 
-        // First message must be "auth"
+        // AUTH REQUIRED
         if (!conn) {
           if (msg.type !== "auth" || typeof msg.userId !== "string") {
             return ws.send(
               JSON.stringify({
                 type: "error",
                 code: "UNAUTHORIZED",
-                reason: "First message must be 'auth' with a valid userId",
+                reason: "First message must be 'auth' with valid userId",
               })
             );
           }
 
-          // Check if another live connection exists
           const existing = this.clients.get(msg.userId);
           if (existing && existing.ws.readyState === WebSocket.OPEN) {
             return ws.send(
@@ -89,8 +79,8 @@ export class ChatServer {
             );
           }
 
-          // Authorize connection
-          clearTimeout(authTimeout); // Cancel timeout
+          clearTimeout(authTimeout);
+
           const user = this.userRepo.findById(msg.userId) ?? null;
           conn = { userId: msg.userId, ws, user, rooms: new Set() };
           this.clients.set(msg.userId, conn);
@@ -99,61 +89,45 @@ export class ChatServer {
           return;
         }
 
-        // Already authorized → normal message flow
         this.handleMessage(conn, msg);
-      } catch (err) {
+      } catch {
         ws.send(JSON.stringify({ type: "error", error: "Invalid JSON" }));
       }
     });
 
     ws.on("close", () => {
-      clearTimeout(authTimeout); // Ensure timeout is cleared
-      if (!conn) return;
-      this.onClose(conn);
+      clearTimeout(authTimeout);
+      if (conn) this.onClose(conn);
     });
   }
 
   private onClose(conn: ClientConnection) {
-    // remove from rooms
     for (const roomId of conn.rooms) {
       const participants = this.roomParticipants.get(roomId);
       if (participants) {
         participants.delete(conn.userId);
         this.notifyRoomCount(roomId, participants.size);
+        this.touchRoom(roomId);
       }
     }
-    // mark user disconnected
+
     if (conn.user) {
       conn.user.touchConnected(false);
       this.userRepo.upsert(conn.user);
     }
+
     this.clients.delete(conn.userId);
   }
 
+  /* ---------------------- MESSAGE HANDLING ---------------------- */
+
   private handleMessage(conn: ClientConnection, msg: any) {
     const ws = conn.ws;
-    if (!msg || !msg.type)
+    if (!msg?.type)
       return ws.send(JSON.stringify({ type: "error", error: "type required" }));
 
-    if (msg.type === "init") {
-      if (msg.userId && typeof msg.userId === "string") {
-        // if existing user in repo -> restore profile
-        const u = this.userRepo.findById(msg.userId);
-        if (u) {
-          conn.userId = u.id;
-          conn.user = u;
-          this.clients.set(conn.userId, conn);
-        } else {
-          // keep new generated userId
-        }
-      }
-      return;
-    }
-
     if (msg.type === "profile") {
-      const nickname = msg.nickname;
-      const color = msg.color;
-      const avatarUrl = msg.avatarUrl;
+      const { nickname, color, avatarUrl } = msg;
       let user = this.userRepo.findById(conn.userId);
       if (!user) {
         user = new User(
@@ -180,16 +154,23 @@ export class ChatServer {
         return ws.send(
           JSON.stringify({ type: "error", error: "room not found or archived" })
         );
+
       let participants = this.roomParticipants.get(roomId);
       if (!participants) {
         participants = new Set();
         this.roomParticipants.set(roomId, participants);
       }
+
       participants.add(conn.userId);
       conn.rooms.add(roomId);
+      this.touchRoom(roomId);
 
-      const messages = this.msgRepo.findLastN(roomId, 100);
-      ws.send(JSON.stringify({ type: "history", messages }));
+      ws.send(
+        JSON.stringify({
+          type: "history",
+          messages: this.msgRepo.findLastN(roomId, 100),
+        })
+      );
 
       this.notifyRoomCount(roomId, participants.size);
       this.broadcastRoomsList();
@@ -203,6 +184,7 @@ export class ChatServer {
         participants.delete(conn.userId);
         conn.rooms.delete(roomId);
         this.notifyRoomCount(roomId, participants.size);
+        this.touchRoom(roomId);
       }
       return;
     }
@@ -214,32 +196,32 @@ export class ChatServer {
         return ws.send(
           JSON.stringify({ type: "error", error: "empty message" })
         );
+
       const room = this.roomRepo.findById(roomId);
       if (!room || room.archived)
         return ws.send(
           JSON.stringify({ type: "error", error: "room not found" })
         );
-      const escaped = escapeHtml(content);
-      const nickname = conn.user?.nickname ?? null;
-      const color = conn.user?.color ?? null;
-      const userId = conn.userId;
+
       const message = new Message(
         null,
         roomId,
-        userId,
-        nickname,
-        color,
-        escaped,
+        conn.userId,
+        conn.user?.nickname ?? null,
+        conn.user?.color ?? null,
+        escapeHtml(content),
         new Date().toISOString()
       );
+
       this.msgRepo.save(message);
+      this.touchRoom(roomId);
 
       const participants = this.roomParticipants.get(roomId);
       if (participants) {
         const payload = JSON.stringify({ type: "message", message });
         for (const uid of participants) {
           const c = this.clients.get(uid);
-          if (c && c.ws.readyState === WebSocket.OPEN) c.ws.send(payload);
+          if (c?.ws.readyState === WebSocket.OPEN) c.ws.send(payload);
         }
       }
       return;
@@ -252,33 +234,89 @@ export class ChatServer {
         return ws.send(
           JSON.stringify({ type: "error", error: "room not found" })
         );
+
       if (room.creatorUserId && room.creatorUserId !== conn.userId)
         return ws.send(
           JSON.stringify({ type: "error", error: "only creator can delete" })
         );
-      this.roomRepo.archive(roomId);
-      this.broadcastRoomDeleted(roomId);
-      this.broadcastRoomsList();
+
+      this.archiveRoom(roomId);
       return;
     }
 
     ws.send(JSON.stringify({ type: "error", error: "unknown type" }));
   }
 
+  /* ---------------------- ROOM LIFECYCLE ---------------------- */
+
+  private touchRoom(roomId: number) {
+    this.roomLastActivity.forEach((v, k) => {
+      console.log(`${k}:${v}`);
+    });
+    this.roomLastActivity.set(roomId, Date.now());
+  }
+
+  private startRoomCleanupLoop() {
+    setInterval(() => {
+      const now = Date.now();
+      const ttl = this.chatLifeDurationSeconds * 1000;
+
+      for (const [roomId, last] of this.roomLastActivity.entries()) {
+        if (now - last >= ttl) {
+          this.archiveRoom(roomId);
+        }
+      }
+    }, 10_000);
+  }
+
+  private archiveRoom(roomId: number) {
+    const room = this.roomRepo.findById(roomId);
+    if (!room || room.archived) return;
+
+    this.roomRepo.archive(roomId);
+    this.roomParticipants.delete(roomId);
+    this.roomLastActivity.delete(roomId);
+
+    this.broadcastRoomDeleted(roomId);
+    this.broadcastRoomsList();
+  }
+
+  /* ---------------------- BROADCASTS ---------------------- */
+
   private notifyRoomCount(roomId: number, count: number) {
-    const update = JSON.stringify({ type: "roomUpdate", roomId, count });
+    const payload = JSON.stringify({ type: "roomUpdate", roomId, count });
     const set = this.roomParticipants.get(roomId);
     if (!set) return;
+
     for (const uid of set) {
       const c = this.clients.get(uid);
-      if (c && c.ws.readyState === WebSocket.OPEN) c.ws.send(update);
+      if (c?.ws.readyState === WebSocket.OPEN) c.ws.send(payload);
     }
   }
 
   private broadcastRoomDeleted(roomId: number) {
-    const notice = JSON.stringify({ type: "roomDeleted", roomId });
+    const payload = JSON.stringify({ type: "roomDeleted", roomId });
     for (const c of this.clients.values()) {
-      if (c.ws.readyState === WebSocket.OPEN) c.ws.send(notice);
+      if (c.ws.readyState === WebSocket.OPEN) c.ws.send(payload);
+    }
+  }
+
+  private broadcastRoomsList() {
+    if (!this.wss) return;
+    const activePublicRooms = this.roomRepo.findActivePublic();
+    const rooms = {
+      ...activePublicRooms,
+      currentParticipants: Array.from(this.roomParticipants.entries()).map(
+        ([roomId, participants]) => ({
+          roomId,
+          count: participants.size,
+        })
+      ),
+    };
+    const payload = JSON.stringify({ type: "roomsListUpdate", rooms });
+
+    for (const client of this.wss.clients) {
+      if (client.readyState === WebSocket.OPEN) client.send(payload);
     }
   }
 }
