@@ -1,7 +1,9 @@
 import { Server as HttpServer } from "http";
+import WebSocket, { WebSocketServer } from "ws";
+import { v4 as uuidv4 } from "uuid";
+
 import { RoomRepository } from "../storage/RoomRepository";
 import { MessageRepository } from "../storage/MessageRepository";
-import WebSocket, { WebSocketServer } from "ws";
 import {
   WebsocketMessage,
   WSOutgoingMessage,
@@ -99,11 +101,23 @@ export class ChatServer {
       }
     }, 5000);
 
-    ws.on("message", (data) => {
+    ws.on("message", (raw) => {
       try {
-        const msg = JSON.parse(data.toString());
+        const msg = JSON.parse(raw.toString());
 
+        /* ---------- PRE-AUTH ---------- */
         if (!conn) {
+          if (msg.type === "requestUserId") {
+            const userId = uuidv4();
+            return this.send(
+              ws,
+              new WebsocketMessage({
+                type: "userIdIssued",
+                userId,
+              })
+            );
+          }
+
           if (msg.type !== "auth" || typeof msg.userId !== "string") {
             return this.send(
               ws,
@@ -136,7 +150,10 @@ export class ChatServer {
 
           this.send(
             ws,
-            new WebsocketMessage({ type: "auth_ok", userId: msg.userId })
+            new WebsocketMessage({
+              type: "auth_ok",
+              userId: msg.userId,
+            })
           );
           return;
         }
@@ -201,10 +218,14 @@ export class ChatServer {
 
       case "joinRoom": {
         const { roomId, nickname } = msg;
+
         if (typeof nickname !== "string" || !nickname.trim()) {
           return this.send(
             conn.ws,
-            new WebsocketMessage({ type: "error", code: "NICKNAME_REQUIRED" })
+            new WebsocketMessage({
+              type: "error",
+              code: "NICKNAME_REQUIRED",
+            })
           );
         }
 
@@ -260,10 +281,6 @@ export class ChatServer {
         this.streamAllRoomsToAllConnectedClients();
         break;
       }
-
-      case "leaveRoom":
-        this.archiveRoom(msg.roomId);
-        break;
 
       case "archiveRoom": {
         const room = this.roomRepo.findById(msg.roomId);

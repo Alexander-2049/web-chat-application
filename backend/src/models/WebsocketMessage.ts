@@ -13,6 +13,11 @@ export interface WSAuthOkMessage {
   userId: string;
 }
 
+export interface WSUserIdIssuedMessage {
+  type: "userIdIssued";
+  userId: string;
+}
+
 export interface WSRoomDataMessage {
   type: "roomData";
   data: {
@@ -90,6 +95,7 @@ export type WSOutgoingMessage =
   | WSErrorMessage
   | WSSuccessMessage
   | WSAuthOkMessage
+  | WSUserIdIssuedMessage
   | WSRoomDataMessage
   | WSRoomConnectedClientsMessage
   | WSAllActiveRoomsMessage
@@ -101,7 +107,7 @@ export type WSOutgoingMessage =
 export class WebsocketMessage<T extends WSOutgoingMessage> {
   constructor(public payload: T) {}
 
-  json() {
+  json(): string {
     return JSON.stringify(this.payload);
   }
 }
