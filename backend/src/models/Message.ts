@@ -1,12 +1,12 @@
 export class Message {
   constructor(
-    public id: number | null,
+    public messageId: number | null,
     public roomId: number,
     public userId: string,
-    public nickname: string | null,
+    public nickname: string,
     public content: string,
-    public sentAt?: string
+    public sentAt: string = "-1"
   ) {
-    if (!this.sentAt) this.sentAt = new Date().toISOString();
+    if (this.sentAt === "-1") this.sentAt = new Date().toISOString();
   }
 }

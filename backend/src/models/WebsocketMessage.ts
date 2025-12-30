@@ -1,59 +1,100 @@
-export type WSMessageType = "error" | "auth" | "data";
+export interface WSErrorMessage {
+  type: "error";
+  code: string;
+}
 
-export class WebsocketMessage<T = unknown> {
-  constructor(
-    public payload:
-      | {
-          type: "error" | "success";
-          code: string;
-        }
-      | {
-          type: "roomData";
-          data: {
-            roomId: number;
-            name: string;
-            connectedClientsAmount: number;
-            maxClients: number | null;
-            creatorUserId: string;
-            archived: boolean;
-          };
-        }
-      | {
-          type: "roomConnectedClients";
-          data: {
-            roomId: number;
-            clients: {
-              id: string;
-              nickname: string;
-            }[];
-          };
-        }
-      | {
-          type: "allActiveRooms";
-          data: {
-            rooms: {
-              roomId: number;
-              name: string;
-              connectedClientsAmount: number;
-              maxClients: number | null;
-              creatorUserId: string;
-              archived: boolean;
-            }[];
-          };
-        }
-      | {
-          type: "roomDestroyed";
-          data: {
-            roomId: number;
-          };
-        }
-      | {
-          type: "closed";
-          code: "DUBLICATE_CONNECTION";
-        }
-  ) {}
+export interface WSSuccessMessage {
+  type: "success";
+  code: string;
+}
 
-  public json() {
+export interface WSRoomDataMessage {
+  type: "roomData";
+  data: {
+    roomId: number;
+    name: string;
+    connectedClientsAmount: number;
+    maxClients: number | null;
+    creatorUserId: string;
+    archived: boolean;
+  };
+}
+
+export interface WSRoomConnectedClientsMessage {
+  type: "roomConnectedClients";
+  data: {
+    roomId: number;
+    clients: {
+      id: string;
+      nickname: string;
+    }[];
+  };
+}
+
+export interface WSAllActiveRoomsMessage {
+  type: "allActiveRooms";
+  data: {
+    rooms: {
+      roomId: number;
+      name: string;
+      connectedClientsAmount: number;
+      maxClients: number | null;
+      creatorUserId: string;
+      archived: boolean;
+    }[];
+  };
+}
+
+export interface WSAllArchivedRoomsMessage {
+  type: "allArchivedRooms";
+  data: {
+    rooms: {
+      roomId: number;
+      name: string;
+      creatorUserId: string;
+      createdAt: string; // new Date().toISOString()
+    }[];
+  };
+}
+
+export interface WSRoomDestroyedMessage {
+  type: "roomDestroyed";
+  data: {
+    roomId: number;
+  };
+}
+
+export interface WSClosedMessage {
+  type: "closed";
+  code: "DUBLICATE_CONNECTION";
+}
+
+export interface WSChatMessage {
+  type: "chatMessage";
+  data: {
+    roomId: number;
+    id: number;
+    userId: string;
+    nickname: string;
+    content: string;
+    sentAt: string; // new Date().toISOString()
+  };
+}
+
+export type WSOutgoingMessage =
+  | WSErrorMessage
+  | WSSuccessMessage
+  | WSRoomDataMessage
+  | WSRoomConnectedClientsMessage
+  | WSAllActiveRoomsMessage
+  | WSAllArchivedRoomsMessage
+  | WSRoomDestroyedMessage
+  | WSClosedMessage
+  | WSChatMessage;
+
+export class WebsocketMessage<T extends WSOutgoingMessage> {
+  constructor(public payload: T) {}
+  json() {
     return JSON.stringify(this.payload);
   }
 }

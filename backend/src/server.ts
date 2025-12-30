@@ -7,11 +7,21 @@ import { RoomRepository } from "./storage/RoomRepository";
 import { MessageRepository } from "./storage/MessageRepository";
 import { ChatServer } from "./ws/ChatServer";
 
+const db = DatabaseFactory.create(
+  path.join(__dirname, "..", "data", "database.sqlite")
+);
+
+process.on("SIGINT", () => {
+  console.log("Shutting down...");
+  db.close();
+  process.exit(0);
+});
+
 async function main() {
   const app = express();
   app.use(
     cors({
-      origin: "http://localhost:4200",
+      origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:4200",
       credentials: true, // если нужны куки, токены и т.п.
     })
   );
@@ -19,13 +29,11 @@ async function main() {
 
   const server = http.createServer(app);
 
-  const db = DatabaseFactory.create(
-    path.join(__dirname, "..", "data", "database.sqlite")
-  );
   const roomRepo = new RoomRepository(db);
   const messageRepo = new MessageRepository(db);
 
   const chatServer = new ChatServer(server, roomRepo, messageRepo);
+  chatServer.setup();
 
   const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
   server.listen(PORT, () =>

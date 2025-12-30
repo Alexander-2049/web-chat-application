@@ -5,9 +5,9 @@ export class Room {
     public maxParticipants: number,
     public creatorUserId: string,
     public archived: boolean = false,
-    public createdAt?: string
+    public createdAt = "-1"
   ) {
-    if (!this.createdAt) this.createdAt = new Date().toISOString();
+    if (this.createdAt === "-1") this.createdAt = new Date().toISOString();
   }
 
   archive() {

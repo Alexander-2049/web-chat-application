@@ -3,7 +3,11 @@ import { RoomRepository } from "../storage/RoomRepository";
 import { MessageRepository } from "../storage/MessageRepository";
 import WebSocket, { WebSocketServer } from "ws";
 import { User } from "../models/User";
-import { WebsocketMessage } from "../models/WebsocketMessage";
+import {
+  WebsocketMessage,
+  WSOutgoingMessage,
+} from "../models/WebsocketMessage";
+import { Message } from "../models/Message";
 
 type ClientConnection = {
   userId: string;
@@ -63,11 +67,21 @@ export class ChatServer {
     if (!room || room.archived) return;
 
     this.roomRepo.archive(roomId);
-    // this.roomParticipants.delete(roomId);
     this.roomLastActivity.delete(roomId);
 
-    // this.broadcastRoomDeleted(roomId);
-    // this.broadcastRoomsList();
+    const participants = this.roomConnectedClients.get(roomId);
+    if (participants) {
+      for (const client of participants.values()) {
+        this.send(client.ws, {
+          type: "roomDestroyed",
+          data: { roomId },
+        });
+        client.rooms.delete(roomId);
+      }
+      this.roomConnectedClients.delete(roomId);
+    }
+
+    this.streamAllRoomsToAllConnectedClients();
   }
 
   /* ---------------------- CONNECTION / AUTH ---------------------- */
@@ -142,22 +156,153 @@ export class ChatServer {
       const participants = this.roomConnectedClients.get(roomId);
       if (participants) {
         participants.delete(conn.userId);
-        this.streamRoomToRoom(roomId);
+        this.streamRoomStateToParticipants(roomId);
         this.touchRoom(roomId);
       }
     }
 
+    this.clients.delete(conn.userId);
+
     if (conn.user) {
-      this.clients.delete(conn.userId);
       this.users.set(conn.userId, conn.user);
     }
+  }
 
-    this.clients.delete(conn.userId);
+  private send(ws: WebSocket, msg: WSOutgoingMessage) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
+    }
   }
 
   /* ---------------------- MESSAGE HANDLING ---------------------- */
 
-  private handleMessage(conn: ClientConnection, msg: any) {}
+  private handleMessage(conn: ClientConnection, msg: any) {
+    switch (msg.type) {
+      case "getAllRooms":
+        this.streamAllRoomsToClient(conn);
+        break;
+
+      case "getAllArchivedRooms": {
+        const rooms = this.roomRepo.listArchived();
+        this.send(conn.ws, {
+          type: "allArchivedRooms",
+          data: {
+            rooms: rooms.map((r) => ({
+              roomId: r.id,
+              name: r.name,
+              creatorUserId: r.creatorUserId,
+              createdAt: r.createdAt,
+            })),
+          },
+        });
+        break;
+      }
+
+      case "joinRoom": {
+        const room = this.roomRepo.findById(msg.roomId);
+        if (!room) {
+          return this.send(conn.ws, {
+            type: "error",
+            code: "ROOM_NOT_FOUND",
+          });
+        }
+
+        if (room.archived) {
+          return this.send(conn.ws, {
+            type: "error",
+            code: "ROOM_ARCHIVED",
+          });
+        }
+
+        if (conn.rooms.has(room.id)) return;
+
+        let participants = this.roomConnectedClients.get(room.id);
+        if (!participants) {
+          participants = new Map();
+          this.roomConnectedClients.set(room.id, participants);
+        }
+
+        if (!room.canJoin(participants.size)) {
+          return this.send(conn.ws, {
+            type: "error",
+            code: "ROOM_FULL",
+          });
+        }
+
+        participants.set(conn.userId, conn);
+        conn.rooms.add(room.id);
+
+        const history = this.msgRepo.findAllByRoom(room.id);
+        history.forEach((m) =>
+          this.send(conn.ws, {
+            type: "chatMessage",
+            data: {
+              roomId: room.id,
+              id: m.messageId!,
+              userId: m.userId,
+              nickname: m.nickname,
+              content: m.content,
+              sentAt: m.sentAt,
+            },
+          })
+        );
+
+        this.touchRoom(room.id);
+        this.streamRoomStateToParticipants(room.id);
+        this.streamAllRoomsToAllConnectedClients();
+        break;
+      }
+
+      case "leaveRoom": {
+        const participants = this.roomConnectedClients.get(msg.roomId);
+        if (participants) {
+          participants.delete(conn.userId);
+          conn.rooms.delete(msg.roomId);
+          this.touchRoom(msg.roomId);
+          this.streamRoomStateToParticipants(msg.roomId);
+          this.streamAllRoomsToAllConnectedClients();
+        }
+        break;
+      }
+
+      case "sendMessage": {
+        if (!conn.rooms.has(msg.roomId)) return;
+
+        const message = this.msgRepo.save(
+          new Message(
+            null,
+            msg.roomId,
+            conn.userId,
+            conn.user?.nickname || "",
+            msg.content
+          )
+        );
+
+        const participants = this.roomConnectedClients.get(msg.roomId);
+        if (!participants) return;
+
+        for (const client of participants.values()) {
+          this.send(client.ws, {
+            type: "chatMessage",
+            data: {
+              roomId: msg.roomId,
+              id: message.messageId!,
+              userId: message.userId,
+              nickname: message.nickname,
+              content: message.content,
+              sentAt: message.sentAt,
+            },
+          });
+        }
+
+        this.touchRoom(msg.roomId);
+        break;
+      }
+
+      default:
+        this.send(conn.ws, { type: "error", code: "UNKNOWN_MESSAGE_TYPE" });
+    }
+  }
 
   /* ------------------------- STREAM DATA ------------------------ */
 
@@ -176,21 +321,17 @@ export class ChatServer {
       };
     });
 
-    const payload = new WebsocketMessage({
+    this.send(client.ws, {
       type: "allActiveRooms",
       data: { rooms: roomsList },
-    }).json();
-
-    client.ws.send(payload);
+    });
   }
 
   private streamAllRoomsToAllConnectedClients() {
     const rooms = this.roomRepo.findActive();
 
-    // update per-room clients about their room state
-    rooms.forEach((room) => this.streamRoomToRoom(room.id));
+    rooms.forEach((room) => this.streamRoomStateToParticipants(room.id));
 
-    // broadcast aggregated rooms list to all connected clients
     const roomsList = rooms.map((room) => {
       const connected = this.roomConnectedClients.get(room.id);
       return {
@@ -203,65 +344,53 @@ export class ChatServer {
       };
     });
 
-    const payload = new WebsocketMessage({
-      type: "allActiveRooms",
-      data: { rooms: roomsList },
-    }).json();
-
     for (const client of this.clients.values()) {
-      client.ws.send(payload);
+      this.send(client.ws, {
+        type: "allActiveRooms",
+        data: { rooms: roomsList },
+      });
     }
   }
 
-  private streamRoomToRoom(roomId: number) {
-    const clients = this.roomConnectedClients.get(roomId) || [];
-    const roomConnectedClients = this.roomConnectedClients.get(roomId);
+  private streamRoomStateToParticipants(roomId: number) {
     const room = this.roomRepo.findById(roomId);
+    const participants = this.roomConnectedClients.get(roomId);
 
-    if (!room || !roomConnectedClients) {
-      return clients.forEach((client) => {
-        client.ws.send(
-          new WebsocketMessage({
-            type: "roomDestroyed",
-            data: {
-              roomId: roomId,
-            },
-          }).json()
-        );
-      });
+    if (!participants || participants.size === 0) return;
+
+    if (!room || room.archived) {
+      for (const client of participants.values()) {
+        this.send(client.ws, {
+          type: "roomDestroyed",
+          data: { roomId },
+        });
+      }
+      return;
     }
 
-    clients.forEach((client) => {
-      client.ws.send(
-        new WebsocketMessage({
-          type: "roomData",
-          data: {
-            roomId: roomId,
-            name: room.name,
-            connectedClientsAmount: roomConnectedClients.size || 0,
-            maxClients: room.maxParticipants,
-            creatorUserId: room.creatorUserId,
-            archived: room.archived,
-          },
-        }).json()
-      );
-    });
+    for (const client of participants.values()) {
+      this.send(client.ws, {
+        type: "roomData",
+        data: {
+          roomId,
+          name: room.name,
+          connectedClientsAmount: participants.size,
+          maxClients: room.maxParticipants ?? null,
+          creatorUserId: room.creatorUserId,
+          archived: room.archived,
+        },
+      });
 
-    clients.forEach((client) => {
-      client.ws.send(
-        new WebsocketMessage({
-          type: "roomConnectedClients",
-          data: {
-            roomId,
-            clients: Array.from(roomConnectedClients.values()).map((e) => {
-              return {
-                id: e.userId,
-                nickname: e.user?.nickname || "",
-              };
-            }),
-          },
-        }).json()
-      );
-    });
+      this.send(client.ws, {
+        type: "roomConnectedClients",
+        data: {
+          roomId,
+          clients: Array.from(participants.values()).map((c) => ({
+            id: c.userId,
+            nickname: c.user?.nickname || "",
+          })),
+        },
+      });
+    }
   }
 }

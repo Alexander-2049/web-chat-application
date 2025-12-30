@@ -7,7 +7,7 @@ export class MessageRepository {
   save(message: Message): Message {
     const info = this.db
       .prepare(
-        "INSERT INTO messages(roomId,userId,nickname,color,content,sentAt) VALUES(?,?,?,?,?,?)"
+        "INSERT INTO messages(roomId,userId,nickname,content,sentAt) VALUES(?,?,?,?,?,?)"
       )
       .run(
         message.roomId,
@@ -23,14 +23,14 @@ export class MessageRepository {
         }
       ).id
     );
-    message.id = id;
+    message.messageId = id;
     return message;
   }
 
   findLastN(roomId: number, limit: number): Message[] {
     const rows = this.db
       .prepare(
-        "SELECT id,roomId,userId,nickname,color,content,sentAt FROM messages WHERE roomId = ? ORDER BY id DESC LIMIT ?"
+        "SELECT id,roomId,userId,nickname,content,sentAt FROM messages WHERE roomId = ? ORDER BY id DESC LIMIT ?"
       )
       .all(roomId, limit);
     return rows
@@ -44,7 +44,7 @@ export class MessageRepository {
   findAllByRoom(roomId: number): Message[] {
     const rows = this.db
       .prepare(
-        "SELECT id,roomId,userId,nickname,color,content,sentAt FROM messages WHERE roomId = ? ORDER BY id ASC"
+        "SELECT id,roomId,userId,nickname,content,sentAt FROM messages WHERE roomId = ? ORDER BY id ASC"
       )
       .all(roomId);
     return rows.map(
