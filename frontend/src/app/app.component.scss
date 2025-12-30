@@ -12,6 +12,86 @@ main {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  height: 100%; /* fill grid row */
-  overflow: hidden; /* keep scroll inside */
+  height: 100%;
+  overflow: hidden;
+}
+
+.connection-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f3e8 0%, #e8e4d0 100%);
+  font-family: "Indie Flower", cursive;
+
+  .paper-box {
+    background: #fff;
+    padding: 3rem 4rem;
+    border: 3px solid #2c2c2c;
+    border-radius: 4px;
+    box-shadow: 8px 8px 0 rgba(44, 44, 44, 0.2);
+    text-align: center;
+    max-width: 500px;
+    transform: rotate(-0.5deg);
+
+    h2 {
+      font-size: 2rem;
+      margin: 0 0 1rem 0;
+      color: #2c2c2c;
+    }
+
+    p {
+      font-size: 1.3rem;
+      margin: 0;
+      color: #555;
+    }
+  }
+
+  &.error .paper-box {
+    border-color: #d32f2f;
+
+    h2 {
+      color: #d32f2f;
+    }
+  }
+
+  .retry-btn {
+    margin-top: 1.5rem;
+    padding: 0.8rem 2rem;
+    font-size: 1.2rem;
+    background: #4a90e2;
+    color: white;
+    border: 3px solid #2c2c2c;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 rgba(44, 44, 44, 0.2);
+    transition: all 0.2s;
+
+    &:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.2);
+    }
+
+    &:active {
+      transform: translate(4px, 4px);
+      box-shadow: none;
+    }
+  }
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 1.5rem;
+  border: 4px solid #e0e0e0;
+  border-top-color: #4a90e2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

@@ -1,4 +1,25 @@
-<main class="main">
+<!-- Show loading screen while connecting -->
+<div *ngIf="isConnecting" class="connection-screen">
+  <div class="paper-box indie-flower-regular">
+    <div class="spinner"></div>
+    <h2>Connecting to server...</h2>
+    <p>Please wait while we establish connection</p>
+  </div>
+</div>
+
+<!-- Show error screen if connection failed -->
+<div *ngIf="!isConnecting && !isConnected" class="connection-screen error">
+  <div class="paper-box indie-flower-regular">
+    <h2>Connection Failed</h2>
+    <p>{{ connectionError }}</p>
+    <button (click)="ngOnInit()" class="retry-btn indie-flower-regular">
+      Retry
+    </button>
+  </div>
+</div>
+
+<!-- Show main app only when connected -->
+<main class="main" *ngIf="isConnected">
   <app-header></app-header>
   <div class="content">
     <router-outlet />

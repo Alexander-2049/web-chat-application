@@ -1,99 +1,95 @@
-import { CommonModule } from '@angular/common';
-import { Component, type OnInit, type OnDestroy } from '@angular/core';
+import { CommonModule } from "@angular/common";
+import { Component, OnInit, OnDestroy } from "@angular/core";
 import {
   FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators,
-} from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { randomFloat } from '../utils/random';
-import { RoomService } from '../services/room.service';
-import { WebSocketService } from '../services/websocket.service';
-import { UserService } from '../services/user.service';
-import type { Room } from '../models/api.models';
-import type { Subscription } from 'rxjs';
+} from "@angular/forms";
+import { RouterLink } from "@angular/router";
+import { randomFloat } from "../utils/random";
+import { WebSocketService } from "../services/websocket.service";
+import { UserService } from "../services/user.service";
+import { Room } from "../models/api.models";
+import { Subscription } from "rxjs";
 
 @Component({
-  selector: 'app-rooms',
+  selector: "app-rooms",
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  templateUrl: './rooms.component.html',
-  styleUrl: './rooms.component.scss',
+  templateUrl: "./rooms.component.html",
+  styleUrl: "./rooms.component.scss",
 })
 export class RoomsComponent implements OnInit, OnDestroy {
   wrapperDegAngle = randomFloat(-1.5, 1.5);
   headForm = new FormGroup({
-    searchCreateInputBar: new FormControl('', Validators.required),
+    searchCreateInputBar: new FormControl("", Validators.required),
   });
 
   rooms: Room[] = [];
   filteredRooms: Room[] = [];
   isLoading = true;
-  errorMessage = '';
+  errorMessage = "";
   private subscriptions: Subscription[] = [];
 
+  showCreateRoomModal = false;
+  createRoomForm = new FormGroup({
+    roomName: new FormControl("", Validators.required),
+    maxParticipants: new FormControl<number | null>(null),
+  });
+
   constructor(
-    private roomService: RoomService,
     private wsService: WebSocketService,
     private userService: UserService
   ) {}
 
   async ngOnInit() {
-    this.loadRooms();
+    // Request all rooms
+    this.wsService.getAllRooms();
 
-    const userId = await this.userService.getUserId();
-    this.wsService.connect(userId);
-
-    const roomUpdateSub = this.wsService
-      .getMessagesOfType<any>('roomsListUpdate')
+    const roomsSub = this.wsService
+      .getMessagesOfType<any>("allActiveRooms")
       .subscribe((msg) => {
-        this.rooms = msg.rooms;
+        console.log("[v0] Received rooms:", msg.data.rooms);
+        this.rooms = msg.data.rooms;
+        this.filterRooms();
+        this.isLoading = false;
+      });
+    this.subscriptions.push(roomsSub);
+
+    const roomDestroyedSub = this.wsService
+      .getMessagesOfType<any>("roomDestroyed")
+      .subscribe((msg) => {
+        this.rooms = this.rooms.filter((r) => r.roomId !== msg.data.roomId);
         this.filterRooms();
       });
-    this.subscriptions.push(roomUpdateSub);
-
-    const roomDeletedSub = this.wsService
-      .getMessagesOfType<any>('roomDeleted')
-      .subscribe((msg) => {
-        this.rooms = this.rooms.filter((r) => r.id !== msg.roomId);
-        this.filterRooms();
-      });
-    this.subscriptions.push(roomDeletedSub);
+    this.subscriptions.push(roomDestroyedSub);
 
     const searchSub = this.headForm
-      .get('searchCreateInputBar')
+      .get("searchCreateInputBar")
       ?.valueChanges.subscribe(() => {
         this.filterRooms();
       });
     if (searchSub) {
       this.subscriptions.push(searchSub);
     }
+
+    const errorSub = this.wsService
+      .getMessagesOfType<any>("error")
+      .subscribe((msg) => {
+        console.error("[v0] Error from server:", msg.code);
+        this.errorMessage = `Error: ${msg.code}`;
+      });
+    this.subscriptions.push(errorSub);
   }
 
   ngOnDestroy() {
     this.subscriptions.forEach((sub) => sub.unsubscribe());
   }
 
-  private loadRooms() {
-    this.isLoading = true;
-    this.roomService.getRooms().subscribe({
-      next: (rooms) => {
-        this.rooms = rooms;
-        this.filteredRooms = rooms;
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('[v0] Error loading rooms:', error);
-        this.errorMessage = 'Failed to load rooms';
-        this.isLoading = false;
-      },
-    });
-  }
-
   private filterRooms() {
     const searchTerm =
-      this.headForm.get('searchCreateInputBar')?.value?.toLowerCase() || '';
+      this.headForm.get("searchCreateInputBar")?.value?.toLowerCase() || "";
     if (searchTerm) {
       this.filteredRooms = this.rooms.filter((room) =>
         room.name.toLowerCase().includes(searchTerm)
@@ -103,45 +99,43 @@ export class RoomsComponent implements OnInit, OnDestroy {
     }
   }
 
-  async createRoom() {
-    console.log('createRoom triggered');
-    const roomName = this.headForm.get('searchCreateInputBar')?.value;
-    if (!roomName || roomName.trim() === '') {
+  openCreateRoomModal() {
+    const roomName = this.headForm.get("searchCreateInputBar")?.value;
+    if (roomName && roomName.trim() !== "") {
+      this.createRoomForm.get("roomName")?.setValue(roomName);
+    }
+    this.showCreateRoomModal = true;
+  }
+
+  closeCreateRoomModal() {
+    this.showCreateRoomModal = false;
+    this.createRoomForm.reset();
+  }
+
+  createRoom() {
+    const roomName = this.createRoomForm.get("roomName")?.value;
+    const maxParticipants = this.createRoomForm.get("maxParticipants")?.value;
+
+    if (!roomName || roomName.trim() === "") {
       return;
     }
-    console.log('createRoom roomName: ' + roomName);
 
-    const userId = await this.userService.getUserId();
-    if (!userId) {
-      this.errorMessage = 'User not found';
-      return;
-    }
+    console.log("[v0] Creating room:", roomName, maxParticipants);
+    this.wsService.createRoom(roomName, maxParticipants || null);
 
-    console.log('createRoom userId: ' + userId);
-    this.roomService
-      .createRoom({
-        name: roomName,
-        isPrivate: false,
-        maxParticipants: 10,
-        creatorUserId: userId,
-      })
-      .subscribe({
-        next: (room) => {
-          this.rooms.push(room);
-          this.filterRooms();
-          this.headForm.get('searchCreateInputBar')?.setValue('');
-        },
-        error: (error) => {
-          console.error('[v0] Error creating room:', error);
-          this.errorMessage = 'Failed to create room';
-        },
-      });
+    this.closeCreateRoomModal();
+    this.headForm.get("searchCreateInputBar")?.setValue("");
+
+    // Refresh rooms list
+    setTimeout(() => {
+      this.wsService.getAllRooms();
+    }, 500);
   }
 
   getRoomParticipants(room: Room): string {
-    if (room.maxParticipants) {
-      return `${room.currentParticipants}/${room.maxParticipants}`;
+    if (room.maxClients) {
+      return `${room.connectedClientsAmount}/${room.maxClients}`;
     }
-    return `${room.currentParticipants}`;
+    return `${room.connectedClientsAmount}`;
   }
 }

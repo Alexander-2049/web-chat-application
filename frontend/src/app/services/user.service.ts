@@ -1,16 +1,13 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, type Observable } from 'rxjs';
-import { API_CONFIG } from '../config/api.config';
+import { Injectable } from "@angular/core";
+import { BehaviorSubject, Observable } from "rxjs";
 
 export interface User {
   userId: string;
-  nickname: string;
-  color: string;
-  avatarUrl: string;
+  nickname?: string;
 }
 
 @Injectable({
-  providedIn: 'root',
+  providedIn: "root",
 })
 export class UserService {
   private currentUserSubject = new BehaviorSubject<User | null>(null);
@@ -22,61 +19,59 @@ export class UserService {
   }
 
   private loadUserFromStorage(): void {
-    const userId = localStorage.getItem('userId');
-    const nickname = localStorage.getItem('username');
-    const color = localStorage.getItem('userColor');
-    const avatarUrl = localStorage.getItem('userAvatar');
+    const userId = localStorage.getItem("userId");
+    const nickname = localStorage.getItem("nickname");
 
-    if (userId && nickname) {
+    if (userId) {
       this.currentUserSubject.next({
         userId,
-        nickname,
-        color: color || '#000000',
-        avatarUrl: avatarUrl || '',
+        nickname: nickname || undefined,
       });
     }
   }
 
   setUser(user: User): void {
-    localStorage.setItem('userId', user.userId);
-    localStorage.setItem('username', user.nickname);
-    localStorage.setItem('userColor', user.color);
-    localStorage.setItem('userAvatar', user.avatarUrl);
+    localStorage.setItem("userId", user.userId);
+    if (user.nickname) {
+      localStorage.setItem("nickname", user.nickname);
+    }
     this.currentUserSubject.next(user);
+  }
+
+  setNickname(nickname: string): void {
+    const user = this.currentUserSubject.value;
+    if (user) {
+      user.nickname = nickname;
+      localStorage.setItem("nickname", nickname);
+      this.currentUserSubject.next(user);
+    }
   }
 
   getUser(): User | null {
     return this.currentUserSubject.value;
   }
 
-  async getUserId(): Promise<string> {
-    let userId = localStorage.getItem('userId');
-    if (!userId) {
-      const response = await fetch(
-        API_CONFIG.BASE_URL + '/api/profile/generateUserId'
-      );
-      const obj = (await response.json()) as Record<string, unknown>;
-      if ('userId' in obj && typeof obj['userId'] === 'string') {
-        userId = obj['userId'];
-        localStorage.setItem('userId', userId);
-      } else {
-        throw new Error('Server sent wrong data');
-      }
-    }
+  getUserId(): string | null {
+    return (
+      this.currentUserSubject.value?.userId || localStorage.getItem("userId")
+    );
+  }
 
-    return this.currentUserSubject.value?.userId || userId;
+  getNickname(): string | null {
+    return (
+      this.currentUserSubject.value?.nickname ||
+      localStorage.getItem("nickname")
+    );
   }
 
   isProfileComplete(): boolean {
     const user = this.currentUserSubject.value;
-    return !!user && !!user.nickname;
+    return !!user && !!user.userId;
   }
 
   clearUser(): void {
-    localStorage.removeItem('userId');
-    localStorage.removeItem('username');
-    localStorage.removeItem('userColor');
-    localStorage.removeItem('userAvatar');
+    localStorage.removeItem("userId");
+    localStorage.removeItem("nickname");
     this.currentUserSubject.next(null);
   }
 }

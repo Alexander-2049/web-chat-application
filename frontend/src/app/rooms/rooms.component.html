@@ -2,7 +2,11 @@
   class="rooms-wrapper indie-flower-regular"
   [style.transform]="'rotate(' + wrapperDegAngle + 'deg)'"
 >
-  <form [formGroup]="headForm" class="headForm" (ngSubmit)="createRoom()">
+  <form
+    [formGroup]="headForm"
+    class="headForm"
+    (ngSubmit)="openCreateRoomModal()"
+  >
     <input
       formControlName="searchCreateInputBar"
       type="text"
@@ -16,17 +20,74 @@
       Create
     </button>
   </form>
+
+  <div *ngIf="isLoading" class="loading-message">Loading rooms...</div>
+  <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
+
   <ul class="rooms-list">
     <li
-      *ngFor="let item of rooms; let i = index"
+      *ngFor="let item of filteredRooms; let i = index"
       [style.transform]="'rotate(' + (i % 2 === 0 ? -0.25 : 0.25) + 'deg)'"
     >
-      <a [routerLink]="'/rooms/' + item.id"
+      <a [routerLink]="'/rooms/' + item.roomId"
         ><span class="room-title">{{ item.name }}</span>
         <span class="room-user-count">
-          {{ item.currentParticipants }} / {{ item.maxParticipants }}
+          {{ getRoomParticipants(item) }}
         </span></a
       >
     </li>
   </ul>
+</div>
+
+<!-- Styled modal with paper-like design -->
+<div
+  class="modal-overlay"
+  *ngIf="showCreateRoomModal"
+  (click)="closeCreateRoomModal()"
+>
+  <div
+    class="modal-paper indie-flower-regular"
+    (click)="$event.stopPropagation()"
+  >
+    <h2>Create New Room</h2>
+    <form [formGroup]="createRoomForm" (ngSubmit)="createRoom()">
+      <div class="form-group">
+        <label for="roomName">Room Name</label>
+        <input
+          id="roomName"
+          formControlName="roomName"
+          type="text"
+          placeholder="Enter room name"
+          class="indie-flower-regular"
+        />
+      </div>
+      <div class="form-group">
+        <label for="maxParticipants">Max Participants (optional)</label>
+        <input
+          id="maxParticipants"
+          formControlName="maxParticipants"
+          type="number"
+          placeholder="Leave empty for unlimited"
+          class="indie-flower-regular"
+          min="2"
+        />
+      </div>
+      <div class="modal-buttons">
+        <button
+          type="button"
+          class="cancel-btn indie-flower-regular"
+          (click)="closeCreateRoomModal()"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="create-btn indie-flower-regular"
+          [disabled]="createRoomForm.get('roomName')?.hasError('required')"
+        >
+          Create Room
+        </button>
+      </div>
+    </form>
+  </div>
 </div>

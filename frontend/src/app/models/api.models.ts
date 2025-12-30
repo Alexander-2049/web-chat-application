@@ -12,31 +12,28 @@ export interface AvatarUploadResponse {
 
 // Room models
 export interface Room {
-  id: number;
+  roomId: number;
   name: string;
-  isPrivate: boolean;
-  maxParticipants: number | null;
-  currentParticipants: number;
+  connectedClientsAmount: number;
+  maxClients: number | null;
   creatorUserId: string;
+  archived: boolean;
 }
 
 export interface CreateRoomRequest {
   name: string;
-  isPrivate: boolean;
   maxParticipants: number;
   creatorUserId: string;
 }
 
 // Message models
 export interface Message {
-  id: number; // OK
-  roomId: number; // OK
-  userId: string; // OK
-  nickname: string | null; // OK
-  color: string | null; // OK
-  // avatarUrl: string;
-  content: string; // OK
-  sentAt: string; // OK
+  id: number;
+  roomId: number;
+  userId: string;
+  nickname: string;
+  content: string;
+  sentAt: string;
 }
 
 // WebSocket message types
@@ -45,71 +42,137 @@ export interface WSMessage {
   [key: string]: any;
 }
 
-export interface WSInitMessage extends WSMessage {
-  type: 'auth';
-  userId?: string;
+// Outgoing messages (client -> server)
+export interface WSRequestUserIdMessage {
+  type: "requestUserId";
 }
 
-export interface WSProfileMessage extends WSMessage {
-  type: 'profile';
+export interface WSAuthMessage {
+  type: "auth";
+  userId: string;
+}
+
+export interface WSGetAllRoomsMessage {
+  type: "getAllRooms";
+}
+
+export interface WSGetAllArchivedRoomsMessage {
+  type: "getAllArchivedRooms";
+}
+
+export interface WSJoinRoomMessage {
+  type: "joinRoom";
+  roomId: number;
   nickname: string;
-  color: string;
-  avatarUrl: string;
 }
 
-export interface WSJoinMessage extends WSMessage {
-  type: 'join';
+export interface WSArchiveRoomMessage {
+  type: "archiveRoom";
   roomId: number;
 }
 
-export interface WSLeaveMessage extends WSMessage {
-  type: 'leave';
-  roomId: number;
-}
-
-export interface WSSendMessage extends WSMessage {
-  type: 'message';
+export interface WSSendMessageMessage {
+  type: "sendMessage";
   roomId: number;
   content: string;
 }
 
-export interface WSDeleteRoomMessage extends WSMessage {
-  type: 'deleteRoom';
-  roomId: number;
+export interface WSCreateRoomMessage {
+  type: "createRoom";
+  name: string;
+  maxParticipants: number | null;
 }
 
-export interface WSWelcomeMessage extends WSMessage {
-  type: 'welcome';
+// Incoming messages (server -> client)
+export interface WSUserIdIssuedMessage {
+  type: "userIdIssued";
   userId: string;
 }
 
-export interface WSHistoryMessage extends WSMessage {
-  type: 'history';
-  roomId: number;
-  messages: Message[];
+export interface WSAuthOkMessage {
+  type: "auth_ok";
+  userId: string;
 }
 
-export interface WSIncomingMessage extends WSMessage {
-  type: 'message';
-  message: Message;
+export interface WSRoomDataMessage {
+  type: "roomData";
+  data: {
+    roomId: number;
+    name: string;
+    connectedClientsAmount: number;
+    maxClients: number | null;
+    creatorUserId: string;
+    archived: boolean;
+  };
 }
 
-export interface WSRoomUpdateMessage extends WSMessage {
-  type: 'roomUpdate';
-  room: Room;
+export interface WSRoomConnectedClientsMessage {
+  type: "roomConnectedClients";
+  data: {
+    roomId: number;
+    clients: {
+      id: string;
+      nickname: string;
+    }[];
+  };
 }
 
-export interface WSRoomsListUpdateMessage extends WSMessage {
-  type: 'roomsListUpdate';
-  rooms: Room[];
+export interface WSAllActiveRoomsMessage {
+  type: "allActiveRooms";
+  data: {
+    rooms: {
+      roomId: number;
+      name: string;
+      connectedClientsAmount: number;
+      maxClients: number | null;
+      creatorUserId: string;
+      archived: boolean;
+    }[];
+  };
 }
 
-export interface WSRoomDeletedMessage extends WSMessage {
-  type: 'roomDeleted';
-  roomId: number;
+export interface WSAllArchivedRoomsMessage {
+  type: "allArchivedRooms";
+  data: {
+    rooms: {
+      roomId: number;
+      name: string;
+      creatorUserId: string;
+      createdAt: string;
+    }[];
+  };
 }
 
-export interface WSErrorMessage extends WSMessage {
-  type: 'error';
-  message: string;
+export interface WSRoomDestroyedMessage {
+  type: "roomDestroyed";
+  data: {
+    roomId: number;
+  };
+}
+
+export interface WSClosedMessage {
+  type: "closed";
+  code: "DUBLICATE_CONNECTION";
+}
+
+export interface WSChatMessageMessage {
+  type: "chatMessage";
+  data: {
+    roomId: number;
+    id: number;
+    userId: string;
+    nickname: string;
+    content: string;
+    sentAt: string;
+  };
+}
+
+export interface WSErrorMessage {
+  type: "error";
+  code: string;
+}
+
+export interface WSSuccessMessage {
+  type: "success";
+  code: string;
 }

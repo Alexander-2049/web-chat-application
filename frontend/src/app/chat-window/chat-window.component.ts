@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule } from "@angular/common";
 import {
   Component,
   type ElementRef,
@@ -6,98 +6,133 @@ import {
   type OnInit,
   type AfterViewChecked,
   type OnDestroy,
-} from '@angular/core';
+} from "@angular/core";
 import {
   FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators,
-} from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
-import { randomFloat } from '../utils/random';
-import type { Message } from '../models/api.models';
-import type { Subscription } from 'rxjs';
-import { WebSocketService } from '../services/websocket.service';
-import { UserService } from '../services/user.service';
+} from "@angular/forms";
+import { ActivatedRoute, Router } from "@angular/router";
+import { randomFloat } from "../utils/random";
+import { Message } from "../models/api.models";
+import { Subscription } from "rxjs";
+import { WebSocketService } from "../services/websocket.service";
+import { UserService } from "../services/user.service";
 
 @Component({
-  selector: 'app-chat-window',
+  selector: "app-chat-window",
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
-  templateUrl: './chat-window.component.html',
-  styleUrl: './chat-window.component.scss',
+  templateUrl: "./chat-window.component.html",
+  styleUrl: "./chat-window.component.scss",
 })
 export class ChatWindowComponent
   implements OnInit, AfterViewChecked, OnDestroy
 {
-  @ViewChild('messagesContainer') messagesContainer!: ElementRef;
+  @ViewChild("messagesContainer") messagesContainer!: ElementRef;
 
   wrapperDegAngle = randomFloat(-1.5, 1.5);
   messageForm = new FormGroup({
-    message: new FormControl('', Validators.required),
+    message: new FormControl("", Validators.required),
   });
 
-  defaultNameColor = '#000000';
-  defaultAvatar =
-    'https://t4.ftcdn.net/jpg/00/65/77/27/360_F_65772719_A1UV5kLi5nCEWI0BNLLiFaBPEkUbv5Fv.jpg';
-
   isShaking = false;
-  roomTitle = 'Chat Room';
+  roomTitle = "Chat Room";
   activeUsers = 0;
   roomId: number | null = null;
+  roomClients: { id: string; nickname: string }[] = [];
 
   messages: Message[] = [];
   private subscriptions: Subscription[] = [];
   private shouldScrollToBottom = false;
 
+  showNicknameModal = true;
+  nicknameForm = new FormGroup({
+    nickname: new FormControl("", Validators.required),
+  });
+
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private wsService: WebSocketService,
     private userService: UserService
   ) {}
 
   ngOnInit() {
     this.route.params.subscribe((params) => {
-      const id = params['id'];
+      const id = params["id"];
       if (id) {
         this.roomId = Number.parseInt(id, 10);
-        this.joinRoom();
+
+        // Check if user has a nickname
+        const savedNickname = this.userService.getNickname();
+        if (savedNickname) {
+          this.nicknameForm.get("nickname")?.setValue(savedNickname);
+          this.showNicknameModal = false;
+          this.joinRoom(savedNickname);
+        }
       }
     });
 
-    const historySub = this.wsService
-      .getMessagesOfType<any>('history')
+    const roomDataSub = this.wsService
+      .getMessagesOfType<any>("roomData")
       .subscribe((msg) => {
-        if (msg.roomId === this.roomId) {
-          this.messages = msg.messages;
-          this.shouldScrollToBottom = true;
+        if (msg.data.roomId === this.roomId) {
+          this.roomTitle = msg.data.name;
+          this.activeUsers = msg.data.connectedClientsAmount;
         }
       });
-    this.subscriptions.push(historySub);
+    this.subscriptions.push(roomDataSub);
+
+    const clientsSub = this.wsService
+      .getMessagesOfType<any>("roomConnectedClients")
+      .subscribe((msg) => {
+        if (msg.data.roomId === this.roomId) {
+          this.roomClients = msg.data.clients;
+        }
+      });
+    this.subscriptions.push(clientsSub);
 
     const messageSub = this.wsService
-      .getMessagesOfType<any>('message')
+      .getMessagesOfType<any>("chatMessage")
       .subscribe((msg) => {
-        if (msg.message.roomId === this.roomId) {
-          this.messages.push(msg.message);
+        if (msg.data.roomId === this.roomId) {
+          this.messages.push({
+            id: msg.data.id,
+            roomId: msg.data.roomId,
+            userId: msg.data.userId,
+            nickname: msg.data.nickname,
+            content: msg.data.content,
+            sentAt: msg.data.sentAt,
+          });
           this.shouldScrollToBottom = true;
         }
       });
     this.subscriptions.push(messageSub);
 
-    const roomUpdateSub = this.wsService
-      .getMessagesOfType<any>('roomUpdate')
+    const destroyedSub = this.wsService
+      .getMessagesOfType<any>("roomDestroyed")
       .subscribe((msg) => {
-        if (msg.room.id === this.roomId) {
-          this.roomTitle = msg.room.name;
-          this.activeUsers = msg.room.currentParticipants;
+        if (msg.data.roomId === this.roomId) {
+          alert("This room has been archived.");
+          this.router.navigate(["/rooms"]);
         }
       });
-    this.subscriptions.push(roomUpdateSub);
+    this.subscriptions.push(destroyedSub);
 
-    setTimeout(() => {
-      this.scrollToBottom();
-    });
+    const errorSub = this.wsService
+      .getMessagesOfType<any>("error")
+      .subscribe((msg) => {
+        console.error("[v0] Error from server:", msg.code);
+        if (msg.code === "ROOM_NOT_FOUND" || msg.code === "ROOM_ARCHIVED") {
+          alert(`Error: ${msg.code}`);
+          this.router.navigate(["/rooms"]);
+        } else if (msg.code === "NICKNAME_REQUIRED") {
+          this.showNicknameModal = true;
+        }
+      });
+    this.subscriptions.push(errorSub);
   }
 
   ngAfterViewChecked() {
@@ -108,62 +143,47 @@ export class ChatWindowComponent
   }
 
   ngOnDestroy() {
-    if (this.roomId) {
-      this.wsService.leaveRoom(this.roomId);
-    }
     this.subscriptions.forEach((sub) => sub.unsubscribe());
   }
 
-  private joinRoom() {
+  submitNickname() {
+    const nickname = this.nicknameForm.get("nickname")?.value;
+    if (!nickname || nickname.trim() === "") {
+      return;
+    }
+
+    this.userService.setNickname(nickname);
+    this.joinRoom(nickname);
+    this.showNicknameModal = false;
+  }
+
+  private joinRoom(nickname: string) {
     if (this.roomId) {
-      this.wsService.joinRoom(this.roomId);
+      console.log("[v0] Joining room", this.roomId, "with nickname", nickname);
+      this.wsService.joinRoom(this.roomId, nickname);
     }
   }
 
-  shouldShowAvatar(index: number): boolean {
+  shouldShowNickname(index: number): boolean {
     if (index === 0) return true;
     const currentMsg = this.messages[index];
     const previousMsg = this.messages[index - 1];
     return currentMsg.userId !== previousMsg.userId;
   }
 
-  async isOwnMessage(message: Message): Promise<boolean> {
-    const currentUserId = await this.userService.getUserId();
+  isOwnMessage(message: Message): boolean {
+    const currentUserId = this.userService.getUserId();
     return message.userId === currentUserId;
   }
 
   formatTimestamp(isoString: string): string {
     const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    let relativeTime = '';
-    if (diffMins === 0) {
-      relativeTime = 'just now';
-    } else if (diffMins < 60) {
-      relativeTime =
-        diffMins === 1 ? '1 minute ago' : `${diffMins} minutes ago`;
-    } else if (diffHours < 24) {
-      relativeTime = diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-    } else if (diffDays < 7) {
-      relativeTime = diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-    } else {
-      relativeTime = date.toLocaleDateString();
-    }
-
-    const time = date.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const dateStr = date.toLocaleDateString();
-    return `${dateStr} ${time} (${relativeTime})`;
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
   }
 
   private triggerShake() {
-    const now = Date.now();
     if (this.isShaking) {
       this.isShaking = false;
       setTimeout(() => {
@@ -179,16 +199,16 @@ export class ChatWindowComponent
   }
 
   submitMessage() {
-    const message = this.messageForm.get('message');
+    const message = this.messageForm.get("message");
     if (message === null || message.value === null) return;
-    if (message.hasError('required') || message.value.trim() === '') {
+    if (message.hasError("required") || message.value.trim() === "") {
       this.triggerShake();
       return;
     }
 
     if (this.roomId) {
       this.wsService.sendMessage(this.roomId, message.value);
-      message.setValue('');
+      message.setValue("");
     }
 
     setTimeout(() => {
