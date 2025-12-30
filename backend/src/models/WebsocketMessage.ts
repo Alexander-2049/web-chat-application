@@ -8,8 +8,48 @@ export class WebsocketMessage<T = unknown> {
           code: string;
         }
       | {
-          type: "data";
-          data: T;
+          type: "roomData";
+          data: {
+            roomId: number;
+            name: string;
+            connectedClientsAmount: number;
+            maxClients: number | null;
+            creatorUserId: string;
+            archived: boolean;
+          };
+        }
+      | {
+          type: "roomConnectedClients";
+          data: {
+            roomId: number;
+            clients: {
+              id: string;
+              nickname: string;
+            }[];
+          };
+        }
+      | {
+          type: "allActiveRooms";
+          data: {
+            rooms: {
+              roomId: number;
+              name: string;
+              connectedClientsAmount: number;
+              maxClients: number | null;
+              creatorUserId: string;
+              archived: boolean;
+            }[];
+          };
+        }
+      | {
+          type: "roomDestroyed";
+          data: {
+            roomId: number;
+          };
+        }
+      | {
+          type: "closed";
+          code: "DUBLICATE_CONNECTION";
         }
   ) {}
 

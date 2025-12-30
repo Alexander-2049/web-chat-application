@@ -1,10 +1,9 @@
 export class Room {
   constructor(
-    public id: number | null,
+    public id: number,
     public name: string,
-    public isPrivate: boolean,
-    public maxParticipants: number | null,
-    public creatorUserId?: string | null,
+    public maxParticipants: number,
+    public creatorUserId: string,
     public archived: boolean = false,
     public createdAt?: string
   ) {

@@ -15,7 +15,16 @@ type ClientConnection = {
 export class ChatServer {
   private wss?: WebSocketServer;
   private roomLastActivity = new Map<number, number>();
+  private roomConnectedClients = new Map<
+    number,
+    Map<string, ClientConnection>
+  >();
+
+  // all currently connected clients
   private clients = new Map<string, ClientConnection>();
+
+  // all users independently of current connection state
+  private users = new Map<string, User>();
 
   constructor(
     private server: HttpServer,
@@ -95,17 +104,18 @@ export class ChatServer {
 
           const existing = this.clients.get(msg.userId);
           if (existing && existing.ws.readyState === WebSocket.OPEN) {
-            return ws.send(
+            existing.ws.send(
               new WebsocketMessage({
-                type: "error",
-                code: "DUPLICATE_CONNECTION",
+                type: "closed",
+                code: "DUBLICATE_CONNECTION",
               }).json()
             );
+            existing.ws.close();
           }
 
           clearTimeout(authTimeout);
 
-          const user = this.userRepo.findById(msg.userId) ?? null;
+          const user = this.users.get(msg.userId);
           conn = { userId: msg.userId, ws, user, rooms: new Set() };
           this.clients.set(msg.userId, conn);
 
@@ -129,19 +139,129 @@ export class ChatServer {
 
   private onClose(conn: ClientConnection) {
     for (const roomId of conn.rooms) {
-      const participants = this.roomParticipants.get(roomId);
+      const participants = this.roomConnectedClients.get(roomId);
       if (participants) {
         participants.delete(conn.userId);
-        this.notifyRoomCount(roomId, participants.size);
+        this.streamRoomToRoom(roomId);
         this.touchRoom(roomId);
       }
     }
 
     if (conn.user) {
-      conn.user.touchConnected(false);
-      this.userRepo.upsert(conn.user);
+      this.clients.delete(conn.userId);
+      this.users.set(conn.userId, conn.user);
     }
 
     this.clients.delete(conn.userId);
+  }
+
+  /* ---------------------- MESSAGE HANDLING ---------------------- */
+
+  private handleMessage(conn: ClientConnection, msg: any) {}
+
+  /* ------------------------- STREAM DATA ------------------------ */
+
+  private streamAllRoomsToClient(client: ClientConnection) {
+    const rooms = this.roomRepo.findActive();
+
+    const roomsList = rooms.map((room) => {
+      const connected = this.roomConnectedClients.get(room.id);
+      return {
+        roomId: room.id,
+        name: room.name,
+        connectedClientsAmount: connected?.size || 0,
+        maxClients: room.maxParticipants ?? null,
+        creatorUserId: room.creatorUserId,
+        archived: room.archived,
+      };
+    });
+
+    const payload = new WebsocketMessage({
+      type: "allActiveRooms",
+      data: { rooms: roomsList },
+    }).json();
+
+    client.ws.send(payload);
+  }
+
+  private streamAllRoomsToAllConnectedClients() {
+    const rooms = this.roomRepo.findActive();
+
+    // update per-room clients about their room state
+    rooms.forEach((room) => this.streamRoomToRoom(room.id));
+
+    // broadcast aggregated rooms list to all connected clients
+    const roomsList = rooms.map((room) => {
+      const connected = this.roomConnectedClients.get(room.id);
+      return {
+        roomId: room.id,
+        name: room.name,
+        connectedClientsAmount: connected?.size || 0,
+        maxClients: room.maxParticipants ?? null,
+        creatorUserId: room.creatorUserId,
+        archived: room.archived,
+      };
+    });
+
+    const payload = new WebsocketMessage({
+      type: "allActiveRooms",
+      data: { rooms: roomsList },
+    }).json();
+
+    for (const client of this.clients.values()) {
+      client.ws.send(payload);
+    }
+  }
+
+  private streamRoomToRoom(roomId: number) {
+    const clients = this.roomConnectedClients.get(roomId) || [];
+    const roomConnectedClients = this.roomConnectedClients.get(roomId);
+    const room = this.roomRepo.findById(roomId);
+
+    if (!room || !roomConnectedClients) {
+      return clients.forEach((client) => {
+        client.ws.send(
+          new WebsocketMessage({
+            type: "roomDestroyed",
+            data: {
+              roomId: roomId,
+            },
+          }).json()
+        );
+      });
+    }
+
+    clients.forEach((client) => {
+      client.ws.send(
+        new WebsocketMessage({
+          type: "roomData",
+          data: {
+            roomId: roomId,
+            name: room.name,
+            connectedClientsAmount: roomConnectedClients.size || 0,
+            maxClients: room.maxParticipants,
+            creatorUserId: room.creatorUserId,
+            archived: room.archived,
+          },
+        }).json()
+      );
+    });
+
+    clients.forEach((client) => {
+      client.ws.send(
+        new WebsocketMessage({
+          type: "roomConnectedClients",
+          data: {
+            roomId,
+            clients: Array.from(roomConnectedClients.values()).map((e) => {
+              return {
+                id: e.userId,
+                nickname: e.user?.nickname || "",
+              };
+            }),
+          },
+        }).json()
+      );
+    });
   }
 }

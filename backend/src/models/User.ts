@@ -1,17 +1,7 @@
 export class User {
-  constructor(
-    public id: string,
-    public nickname?: string | null,
-    public color?: string | null,
-    public avatarPath?: string | null,
-    public lastSeen?: string | null
-  ) {}
+  constructor(public id: string, public nickname: string) {}
 
   setProfile(nickname?: string) {
     this.nickname = nickname ?? this.nickname;
-  }
-
-  touchConnected(connected: boolean) {
-    this.lastSeen = new Date().toISOString();
   }
 }

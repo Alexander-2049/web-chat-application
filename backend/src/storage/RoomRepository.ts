@@ -4,34 +4,21 @@ import { Room } from "../models/Room";
 export class RoomRepository {
   constructor(private db: Database) {}
 
-  create(
-    name: string,
-    isPrivate: boolean,
-    maxParticipants: number | null,
-    creatorUserId?: string | null
-  ): Room {
+  create(name: string, maxParticipants: number, creatorUserId: string): Room {
     const createdAt = new Date().toISOString();
     const info = this.db
       .prepare(
-        "INSERT INTO rooms(name,isPrivate,maxParticipants,creatorUserId,archived,createdAt) VALUES(?,?,?,?,0,?)"
+        "INSERT INTO rooms(name,maxParticipants,creatorUserId,archived,createdAt) VALUES(?,?,?,?,0,?)"
       )
-      .run(name, isPrivate ? 1 : 0, maxParticipants, creatorUserId, createdAt);
+      .run(name, maxParticipants, creatorUserId, createdAt);
     const id = Number(info.lastInsertRowid);
-    return new Room(
-      id,
-      name,
-      isPrivate,
-      maxParticipants,
-      creatorUserId,
-      false,
-      createdAt
-    );
+    return new Room(id, name, maxParticipants, creatorUserId, false, createdAt);
   }
 
-  findActivePublic(): Room[] {
+  findActive(): Room[] {
     const rows = this.db
       .prepare(
-        "SELECT id,name,isPrivate,maxParticipants,creatorUserId,archived,createdAt FROM rooms WHERE archived = 0 AND isPrivate = 0"
+        "SELECT id,name,maxParticipants,creatorUserId,archived,createdAt FROM rooms WHERE archived = 0"
       )
       .all();
     return rows.map(
@@ -39,7 +26,6 @@ export class RoomRepository {
         new Room(
           r.id,
           r.name,
-          Boolean(r.isPrivate),
           r.maxParticipants,
           r.creatorUserId,
           Boolean(r.archived),
@@ -51,14 +37,13 @@ export class RoomRepository {
   findById(id: number): Room | null {
     const r = this.db
       .prepare(
-        "SELECT id,name,isPrivate,maxParticipants,creatorUserId,archived,createdAt FROM rooms WHERE id = ?"
+        "SELECT id,name,maxParticipants,creatorUserId,archived,createdAt FROM rooms WHERE id = ?"
       )
       .get(id) as any;
     if (!r) return null;
     return new Room(
       r.id,
       r.name,
-      Boolean(r.isPrivate),
       r.maxParticipants,
       r.creatorUserId,
       Boolean(r.archived),
@@ -73,7 +58,7 @@ export class RoomRepository {
   listArchived(): Room[] {
     const rows = this.db
       .prepare(
-        "SELECT id,name,isPrivate,maxParticipants,creatorUserId,archived,createdAt FROM rooms WHERE archived = 1"
+        "SELECT id,name,maxParticipants,creatorUserId,archived,createdAt FROM rooms WHERE archived = 1"
       )
       .all();
     return rows.map(
@@ -81,7 +66,6 @@ export class RoomRepository {
         new Room(
           r.id,
           r.name,
-          Boolean(r.isPrivate),
           r.maxParticipants,
           r.creatorUserId,
           Boolean(r.archived),
