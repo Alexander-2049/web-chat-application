@@ -159,7 +159,8 @@ export class ChatServer {
         }
 
         this.handleMessage(conn, msg);
-      } catch {
+      } catch (e) {
+        console.error(e);
         this.send(
           ws,
           new WebsocketMessage({ type: "error", code: "INVALID_JSON" })
@@ -297,16 +298,85 @@ export class ChatServer {
         break;
       }
 
-      case "sendMessage": {
-        if (!conn.rooms.has(msg.roomId)) return;
+      case "createRoom": {
+        const { name, maxParticipants } = msg;
 
-        const nickname = conn.nicknames.get(msg.roomId)!;
+        if (typeof name !== "string" || !name.trim()) {
+          return this.send(
+            conn.ws,
+            new WebsocketMessage({
+              type: "error",
+              code: "ROOM_NAME_REQUIRED",
+            })
+          );
+        }
 
-        const message = this.msgRepo.save(
-          new Message(null, msg.roomId, conn.userId, nickname, msg.content)
+        if (
+          maxParticipants !== null &&
+          (typeof maxParticipants !== "number" || maxParticipants <= 0)
+        ) {
+          return this.send(
+            conn.ws,
+            new WebsocketMessage({
+              type: "error",
+              code: "INVALID_MAX_PARTICIPANTS",
+            })
+          );
+        }
+
+        const room = this.roomRepo.create(
+          name.trim(),
+          maxParticipants ?? null,
+          conn.userId
         );
 
-        const participants = this.roomConnectedClients.get(msg.roomId);
+        this.touchRoom(room.id);
+        this.streamAllRoomsToAllConnectedClients();
+
+        this.send(
+          conn.ws,
+          new WebsocketMessage({
+            type: "success",
+            code: "ROOM_CREATED",
+          })
+        );
+        break;
+      }
+
+      case "sendMessage": {
+        const { roomId, content } = msg;
+
+        if (
+          typeof roomId !== "number" ||
+          typeof content !== "string" ||
+          !content.trim()
+        ) {
+          return this.send(
+            conn.ws,
+            new WebsocketMessage({
+              type: "error",
+              code: "INVALID_MESSAGE_FORMAT",
+            })
+          );
+        }
+
+        if (!conn.rooms.has(roomId)) {
+          return this.send(
+            conn.ws,
+            new WebsocketMessage({
+              type: "error",
+              code: "NOT_IN_ROOM",
+            })
+          );
+        }
+
+        const nickname = conn.nicknames.get(roomId)!;
+
+        const message = this.msgRepo.save(
+          new Message(null, roomId, conn.userId, nickname, content.trim())
+        );
+
+        const participants = this.roomConnectedClients.get(roomId);
         if (!participants) return;
 
         for (const client of participants.values()) {
@@ -315,7 +385,7 @@ export class ChatServer {
             new WebsocketMessage({
               type: "chatMessage",
               data: {
-                roomId: msg.roomId,
+                roomId,
                 id: message.messageId!,
                 userId: message.userId,
                 nickname: message.nickname,
@@ -326,7 +396,7 @@ export class ChatServer {
           );
         }
 
-        this.touchRoom(msg.roomId);
+        this.touchRoom(roomId);
         break;
       }
 

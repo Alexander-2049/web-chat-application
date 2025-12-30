@@ -7,7 +7,7 @@ export class MessageRepository {
   save(message: Message): Message {
     const info = this.db
       .prepare(
-        "INSERT INTO messages(roomId,userId,nickname,content,sentAt) VALUES(?,?,?,?,?,?)"
+        "INSERT INTO messages(roomId,userId,nickname,content,sentAt) VALUES(?,?,?,?,?)"
       )
       .run(
         message.roomId,

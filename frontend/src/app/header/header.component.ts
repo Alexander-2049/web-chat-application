@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { UserService } from '../services/user.service';
@@ -15,11 +15,13 @@ import { WebSocketService } from '../services/websocket.service';
 export class HeaderComponent implements OnInit {
   constructor(private userService: UserService, private wsService: WebSocketService) {}
 
-  isUserConnected = false;
-  currentNickname = '';
-  imagesLoaded: { [key: string]: boolean } = {};
+  // 🔥 signals
+  isUserConnected = signal(false);
+  currentNickname = signal('');
+  showSettingsModal = signal(false);
 
-  showSettingsModal = false;
+  imagesLoaded = signal<Record<string, boolean>>({});
+
   settingsForm = new FormGroup({
     nickname: new FormControl('', Validators.required),
   });
@@ -37,40 +39,48 @@ export class HeaderComponent implements OnInit {
   ];
 
   ngOnInit() {
-    this.isUserConnected = !!this.userService.getUserId();
-    this.currentNickname = this.userService.getNickname() || '';
+    this.isUserConnected.set(!!this.userService.getUserId());
+    this.currentNickname.set(this.userService.getNickname() || '');
 
+    // init imagesLoaded
+    const loadedMap: Record<string, boolean> = {};
     this.links.forEach((link) => {
-      this.imagesLoaded[link.icon] = false;
+      loadedMap[link.icon] = false;
     });
+    this.imagesLoaded.set(loadedMap);
 
     this.wsService.isConnected$.subscribe((connected) => {
-      this.isUserConnected = connected;
+      this.isUserConnected.set(connected);
     });
   }
 
   onImageLoad(icon: string) {
-    this.imagesLoaded[icon] = true;
+    this.imagesLoaded.update((map) => ({
+      ...map,
+      [icon]: true,
+    }));
   }
 
   openSettingsModal() {
-    this.settingsForm.get('nickname')?.setValue(this.currentNickname);
-    this.showSettingsModal = true;
+    this.settingsForm.get('nickname')?.setValue(this.currentNickname());
+
+    this.showSettingsModal.set(true);
   }
 
   closeSettingsModal() {
-    this.showSettingsModal = false;
+    this.showSettingsModal.set(false);
     this.settingsForm.reset();
   }
 
   saveSettings() {
     const nickname = this.settingsForm.get('nickname')?.value;
-    if (!nickname || nickname.trim() === '') {
+
+    if (!nickname?.trim()) {
       return;
     }
 
     this.userService.setNickname(nickname);
-    this.currentNickname = nickname;
+    this.currentNickname.set(nickname);
     this.closeSettingsModal();
   }
 }

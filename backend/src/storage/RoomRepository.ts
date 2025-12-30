@@ -8,7 +8,7 @@ export class RoomRepository {
     const createdAt = new Date().toISOString();
     const info = this.db
       .prepare(
-        "INSERT INTO rooms(name,maxParticipants,creatorUserId,archived,createdAt) VALUES(?,?,?,?,0,?)"
+        "INSERT INTO rooms(name,maxParticipants,creatorUserId,archived,createdAt) VALUES(?,?,?,0,?)"
       )
       .run(name, maxParticipants, creatorUserId, createdAt);
     const id = Number(info.lastInsertRowid);

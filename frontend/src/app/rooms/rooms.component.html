@@ -1,6 +1,6 @@
 <div
   class="rooms-wrapper indie-flower-regular"
-  [style.transform]="'rotate(' + wrapperDegAngle + 'deg)'"
+  [style.transform]="'rotate(' + wrapperDegAngle() + 'deg)'"
 >
   <form [formGroup]="headForm" class="headForm" (ngSubmit)="openCreateRoomModal()">
     <input
@@ -17,28 +17,32 @@
     </button>
   </form>
 
-  <div *ngIf="isLoading" class="loading-message">Loading rooms...</div>
-  <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
+  @if (isLoading()) {
+  <div class="loading-message">Loading rooms...</div>
+  } @if (errorMessage()) {
+  <div class="error-message">{{ errorMessage() }}</div>
+  }
 
   <ul class="rooms-list">
-    <li
-      *ngFor="let item of filteredRooms; let i = index"
-      [style.transform]="'rotate(' + (i % 2 === 0 ? -0.25 : 0.25) + 'deg)'"
-    >
-      <a [routerLink]="'/rooms/' + item.roomId"
-        ><span class="room-title">{{ item.name }}</span>
+    @for (item of filteredRooms(); track item.roomId; let i = $index) {
+    <li [style.transform]="'rotate(' + (i % 2 === 0 ? -0.25 : 0.25) + 'deg)'">
+      <a [routerLink]="'/rooms/' + item.roomId">
+        <span class="room-title">{{ item.name }}</span>
         <span class="room-user-count">
           {{ getRoomParticipants(item) }}
-        </span></a
-      >
+        </span>
+      </a>
     </li>
+    }
   </ul>
 </div>
 
-<!-- Styled modal with paper-like design -->
-<div class="modal-overlay" *ngIf="showCreateRoomModal" (click)="closeCreateRoomModal()">
+<!-- Create room modal -->
+@if (showCreateRoomModal()) {
+<div class="modal-overlay" (click)="closeCreateRoomModal()">
   <div class="modal-paper indie-flower-regular" (click)="$event.stopPropagation()">
     <h2>Create New Room</h2>
+
     <form [formGroup]="createRoomForm" (ngSubmit)="createRoom()">
       <div class="form-group">
         <label for="roomName">Room Name</label>
@@ -50,8 +54,9 @@
           class="indie-flower-regular"
         />
       </div>
+
       <div class="form-group">
-        <label for="maxParticipants">Max Participants (optional)</label>
+        <label for="maxParticipants"> Max Participants (optional) </label>
         <input
           id="maxParticipants"
           formControlName="maxParticipants"
@@ -61,6 +66,7 @@
           min="2"
         />
       </div>
+
       <div class="modal-buttons">
         <button
           type="button"
@@ -69,6 +75,7 @@
         >
           Cancel
         </button>
+
         <button
           type="submit"
           class="create-btn indie-flower-regular"
@@ -80,3 +87,4 @@
     </form>
   </div>
 </div>
+}

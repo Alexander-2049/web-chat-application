@@ -1,6 +1,8 @@
-<div class="header-container" [class.ready]="isUserConnected">
-  <ul class="urls indie-flower-regular" *ngIf="isUserConnected">
-    <li *ngFor="let item of links" [class.image-loaded]="imagesLoaded[item.icon]">
+<div class="header-container" [class.ready]="isUserConnected()">
+  @if (isUserConnected()) {
+  <ul class="urls indie-flower-regular">
+    @for (item of links; track item.icon) {
+    <li [class.image-loaded]="imagesLoaded()[item.icon]">
       <a [routerLink]="item.path">
         <img
           [src]="item.icon"
@@ -11,6 +13,8 @@
         <span class="link-text">{{ item.title }}</span>
       </a>
     </li>
+    }
+
     <li class="settings-link">
       <button (click)="openSettingsModal()" class="settings-btn indie-flower-regular">
         <span class="settings-icon">⚙</span>
@@ -18,20 +22,26 @@
       </button>
     </li>
   </ul>
-  <ul class="urls skeleton" *ngIf="!isUserConnected">
-    <li *ngFor="let item of links">
+  } @else {
+  <ul class="urls skeleton">
+    @for (item of links; track item.icon) {
+    <li>
       <a>
         <div class="skeleton-icon"></div>
         <span class="skeleton-text"></span>
       </a>
     </li>
+    }
   </ul>
+  }
 </div>
 
 <!-- Settings modal -->
-<div class="modal-overlay" *ngIf="showSettingsModal" (click)="closeSettingsModal()">
+@if (showSettingsModal()) {
+<div class="modal-overlay" (click)="closeSettingsModal()">
   <div class="modal-paper indie-flower-regular" (click)="$event.stopPropagation()">
     <h2>Settings</h2>
+
     <form [formGroup]="settingsForm" (ngSubmit)="saveSettings()">
       <div class="form-group">
         <label for="nickname">Nickname</label>
@@ -44,6 +54,7 @@
           autofocus
         />
       </div>
+
       <div class="modal-buttons">
         <button
           type="button"
@@ -52,6 +63,7 @@
         >
           Cancel
         </button>
+
         <button
           type="submit"
           class="save-btn indie-flower-regular"
@@ -63,3 +75,4 @@
     </form>
   </div>
 </div>
+}

@@ -1,33 +1,39 @@
 <div class="chat-wrapper">
-  <div class="outer-wrapper" [style.transform]="'rotate(' + wrapperDegAngle + 'deg)'">
+  <div class="outer-wrapper" [style.transform]="'rotate(' + wrapperDegAngle() + 'deg)'">
     <div class="chat-header">
-      <h2 class="room-title indie-flower-regular">{{ roomTitle }}</h2>
-      <div class="user-count indie-flower-regular">{{ activeUsers }} online</div>
+      <h2 class="room-title indie-flower-regular">
+        {{ roomTitle() }}
+      </h2>
+      <div class="user-count indie-flower-regular">{{ activeUsers() }} online</div>
     </div>
 
     <div class="inner-wrapper">
       <div class="messages" #messagesContainer>
-        <div
-          *ngFor="let msg of messages; let i = index"
-          class="message-wrapper"
-          [class.own-message]="isOwnMessage(msg)"
-        >
+        @for (msg of messages(); track msg.id; let i = $index) {
+        <div class="message-wrapper" [class.own-message]="isOwnMessage(msg)">
           <div class="message">
             <div class="bubble-container">
-              <div class="name indie-flower-regular" *ngIf="shouldShowNickname(i)">
+              @if (shouldShowNickname(i)) {
+              <div class="name indie-flower-regular">
                 {{ msg.nickname }}
               </div>
-              <div class="bubble indie-flower-regular">{{ msg.content }}</div>
+              }
+
+              <div class="bubble indie-flower-regular">
+                {{ msg.content }}
+              </div>
+
               <div class="timestamp indie-flower-regular">
                 {{ formatTimestamp(msg.sentAt) }}
               </div>
             </div>
           </div>
         </div>
+        }
       </div>
 
       <div class="chat-input-outer">
-        <form [formGroup]="messageForm" class="chat-input-inner" [class.shake]="isShaking">
+        <form [formGroup]="messageForm" class="chat-input-inner" [class.shake]="isShaking()">
           <input
             formControlName="message"
             type="text"
@@ -35,6 +41,7 @@
             class="indie-flower-regular"
             (keydown.enter)="submitMessage()"
           />
+
           <div class="submit-message-button-area">
             <button type="button" (click)="submitMessage()" class="indie-flower-regular">
               Send
@@ -46,11 +53,13 @@
   </div>
 </div>
 
-<!-- Styled nickname modal with paper-like design -->
-<div class="modal-overlay" *ngIf="showNicknameModal">
+<!-- Nickname modal -->
+@if (showNicknameModal()) {
+<div class="modal-overlay">
   <div class="modal-paper indie-flower-regular" (click)="$event.stopPropagation()">
     <h2>Enter Your Nickname</h2>
     <p class="modal-description">Choose a nickname to join this chat room</p>
+
     <form [formGroup]="nicknameForm" (ngSubmit)="submitNickname()">
       <div class="form-group">
         <label for="nickname">Nickname</label>
@@ -63,6 +72,7 @@
           autofocus
         />
       </div>
+
       <div class="modal-buttons">
         <button
           type="submit"
@@ -75,3 +85,4 @@
     </form>
   </div>
 </div>
+}

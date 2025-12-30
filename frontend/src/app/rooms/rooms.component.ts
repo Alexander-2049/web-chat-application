@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { randomFloat } from '../utils/random';
@@ -16,84 +16,84 @@ import { Subscription } from 'rxjs';
   styleUrl: './rooms.component.scss',
 })
 export class RoomsComponent implements OnInit, OnDestroy {
-  wrapperDegAngle = randomFloat(-1.5, 1.5);
+  // 🔥 signals
+  wrapperDegAngle = signal(randomFloat(-1.5, 1.5));
+  rooms = signal<Room[]>([]);
+  isLoading = signal(true);
+  errorMessage = signal('');
+  showCreateRoomModal = signal(false);
+
   headForm = new FormGroup({
     searchCreateInputBar: new FormControl('', Validators.required),
   });
 
-  rooms: Room[] = [];
-  filteredRooms: Room[] = [];
-  isLoading = true;
-  errorMessage = '';
-  private subscriptions: Subscription[] = [];
-
-  showCreateRoomModal = false;
   createRoomForm = new FormGroup({
     roomName: new FormControl('', Validators.required),
     maxParticipants: new FormControl<number | null>(null),
   });
 
+  // 🔥 computed rooms list
+  filteredRooms = computed(() => {
+    const search = this.headForm.get('searchCreateInputBar')?.value?.toLowerCase() || '';
+
+    if (!search) {
+      return this.rooms();
+    }
+
+    return this.rooms().filter((room) => room.name.toLowerCase().includes(search));
+  });
+
+  private subscriptions: Subscription[] = [];
+
   constructor(private wsService: WebSocketService, private userService: UserService) {}
 
-  async ngOnInit() {
-    // Request all rooms
+  ngOnInit() {
     this.wsService.getAllRooms();
 
     const roomsSub = this.wsService.getMessagesOfType<any>('allActiveRooms').subscribe((msg) => {
-      console.log('[v0] Received rooms:', msg.data.rooms);
-      this.rooms = msg.data.rooms;
-      this.filterRooms();
-      this.isLoading = false;
+      this.rooms.set(msg.data.rooms);
+      this.isLoading.set(false);
     });
-    this.subscriptions.push(roomsSub);
 
     const roomDestroyedSub = this.wsService
       .getMessagesOfType<any>('roomDestroyed')
       .subscribe((msg) => {
-        this.rooms = this.rooms.filter((r) => r.roomId !== msg.data.roomId);
-        this.filterRooms();
+        this.rooms.update((rooms) => rooms.filter((r) => r.roomId !== msg.data.roomId));
       });
-    this.subscriptions.push(roomDestroyedSub);
 
     const searchSub = this.headForm.get('searchCreateInputBar')?.valueChanges.subscribe(() => {
-      this.filterRooms();
+      /* computed сам пересчитается */
     });
-    if (searchSub) {
-      this.subscriptions.push(searchSub);
-    }
 
     const errorSub = this.wsService.getMessagesOfType<any>('error').subscribe((msg) => {
       console.error('[v0] Error from server:', msg.code);
-      this.errorMessage = `Error: ${msg.code}`;
+      this.errorMessage.set(`Error: ${msg.code}`);
     });
-    this.subscriptions.push(errorSub);
+
+    this.subscriptions.push(
+      roomsSub,
+      roomDestroyedSub,
+      ...(searchSub ? [searchSub] : []),
+      errorSub
+    );
   }
 
   ngOnDestroy() {
-    this.subscriptions.forEach((sub) => sub.unsubscribe());
-  }
-
-  private filterRooms() {
-    const searchTerm = this.headForm.get('searchCreateInputBar')?.value?.toLowerCase() || '';
-    if (searchTerm) {
-      this.filteredRooms = this.rooms.filter((room) =>
-        room.name.toLowerCase().includes(searchTerm)
-      );
-    } else {
-      this.filteredRooms = this.rooms;
-    }
+    this.subscriptions.forEach((s) => s.unsubscribe());
   }
 
   openCreateRoomModal() {
     const roomName = this.headForm.get('searchCreateInputBar')?.value;
-    if (roomName && roomName.trim() !== '') {
+
+    if (roomName?.trim()) {
       this.createRoomForm.get('roomName')?.setValue(roomName);
     }
-    this.showCreateRoomModal = true;
+
+    this.showCreateRoomModal.set(true);
   }
 
   closeCreateRoomModal() {
-    this.showCreateRoomModal = false;
+    this.showCreateRoomModal.set(false);
     this.createRoomForm.reset();
   }
 
@@ -101,26 +101,21 @@ export class RoomsComponent implements OnInit, OnDestroy {
     const roomName = this.createRoomForm.get('roomName')?.value;
     const maxParticipants = this.createRoomForm.get('maxParticipants')?.value;
 
-    if (!roomName || roomName.trim() === '') {
+    if (!roomName?.trim()) {
       return;
     }
 
-    console.log('[v0] Creating room:', roomName, maxParticipants);
     this.wsService.createRoom(roomName, maxParticipants || null);
 
     this.closeCreateRoomModal();
     this.headForm.get('searchCreateInputBar')?.setValue('');
 
-    // Refresh rooms list
-    setTimeout(() => {
-      this.wsService.getAllRooms();
-    }, 500);
+    setTimeout(() => this.wsService.getAllRooms(), 500);
   }
 
   getRoomParticipants(room: Room): string {
-    if (room.maxClients) {
-      return `${room.connectedClientsAmount}/${room.maxClients}`;
-    }
-    return `${room.connectedClientsAmount}`;
+    return room.maxClients
+      ? `${room.connectedClientsAmount}/${room.maxClients}`
+      : `${room.connectedClientsAmount}`;
   }
 }
