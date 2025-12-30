@@ -1,189 +1,284 @@
-# API Endpoints Documentation (ENDPOINTS.md)
+# WebSocket Chat API
 
-This document describes **all HTTP and WebSocket endpoints** available
-in the OOP Chat Backend.
+**Endpoint:** `ws://<host>/ws/chat`
 
-Base URL:
+This document describes the full WebSocket communication protocol between client and server.
 
-    http://localhost:8080
+---
 
-WebSocket URL:
+## Connection Lifecycle
 
-    ws://localhost:8080/ws/chat
+### 1. Connect
 
-------------------------------------------------------------------------
+Client opens a WebSocket connection to:
 
-# 1. HTTP REST API
+```
+ws://<host>/ws/chat
+```
 
-------------------------------------------------------------------------
+### 2. Authentication (required)
 
-## 1.1 Profile
+The very first message **must** be authentication.
 
-### **POST /api/profile/avatar**
+#### Client → Server
 
-Upload and process a user avatar.
-
-**Content-Type:** `multipart/form-data`
-
-**Fields:** - `userId` --- string, required\
-- `file` --- binary image (jpeg/png/jpg/webp/gif ≤ 20MB)
-
-**Response 201:**
-
-``` json
+```json
 {
-  "avatarUrl": "/uploads/avatars/<avatar>.png"
+  "type": "auth",
+  "userId": "string"
 }
 ```
 
-------------------------------------------------------------------------
+* `userId` must be globally unique
+* Only **one active connection per userId** is allowed
 
-### **POST /api/profile/save**
+#### Server → Client (success)
 
-Save or update a user's profile.
-
-**Content-Type:** `application/json`
-
-**Body:**
-
-``` json
+```json
 {
-  "userId": "uuid",
-  "nickname": "Bob",
-  "color": "#aabbcc",
-  "avatarPath": "/uploads/avatars/file.png"
+  "type": "auth_ok",
+  "userId": "string"
 }
 ```
 
-**Response 200:**
+#### Server → Client (errors)
 
-``` json
-{ "ok": true }
+```json
+{ "type": "error", "code": "UNAUTHORIZED" }
+{ "type": "error", "code": "AUTH_TIMEOUT" }
 ```
 
-------------------------------------------------------------------------
+#### Duplicate connection handling
 
-## 1.2 Rooms (Active)
+If the same `userId` connects again:
 
-### **GET /api/rooms**
+```json
+{ "type": "closed", "code": "DUBLICATE_CONNECTION" }
+```
 
-Returns a list of **active public rooms**.
+The **previous connection is closed**, the new one becomes active.
 
-------------------------------------------------------------------------
+---
 
-### **POST /api/rooms**
+## Rooms
 
-Create a new room.
+### Get all active rooms
 
-**Body:**
+#### Client → Server
 
-``` json
+```json
+{ "type": "getAllRooms" }
+```
+
+#### Server → Client
+
+```json
 {
-  "name": "Room Name",
-  "isPrivate": false,
-  "maxParticipants": 10,
-  "creatorUserId": "uuid"
+  "type": "allActiveRooms",
+  "data": {
+    "rooms": [
+      {
+        "roomId": 1,
+        "name": "Room name",
+        "connectedClientsAmount": 2,
+        "maxClients": 10,
+        "creatorUserId": "user123",
+        "archived": false
+      }
+    ]
+  }
 }
 ```
 
-**Response 201:** room object.
+---
 
-------------------------------------------------------------------------
+### Get all archived rooms
 
-## 1.3 Archive
+#### Client → Server
 
-### **GET /api/archive/rooms**
+```json
+{ "type": "getAllArchivedRooms" }
+```
 
-Returns **archived rooms**.
+#### Server → Client
 
-------------------------------------------------------------------------
-
-### **GET /api/archive/rooms/{id}**
-
-Returns **full message history** for the archived room.
-
-------------------------------------------------------------------------
-
-# 2. WebSocket API
-
-WebSocket endpoint:
-
-    ws://localhost:8080/ws/chat
-
-On connect:
-
-``` json
+```json
 {
-  "type": "welcome",
-  "userId": "<uuid>"
+  "type": "allArchivedRooms",
+  "data": {
+    "rooms": [
+      {
+        "roomId": 5,
+        "name": "Old room",
+        "creatorUserId": "user123",
+        "createdAt": "2025-01-01T12:00:00.000Z"
+      }
+    ]
+  }
 }
 ```
 
-------------------------------------------------------------------------
+Archived rooms are **read-only**.
 
-# 3. Client → Server WebSocket Messages
+---
 
-### **init**
+### Join room
 
-``` json
-{ "type": "init", "userId": "<uuid or omitted>" }
-```
+#### Client → Server
 
-### **profile**
-
-``` json
+```json
 {
-  "type": "profile",
-  "nickname": "Bob",
-  "color": "#aabbcc",
-  "avatarUrl": "/uploads/avatars/img.png"
+  "type": "joinRoom",
+  "roomId": 1
 }
 ```
 
-### **join**
+#### Possible errors
 
-``` json
-{ "type": "join", "roomId": 1 }
+```json
+{ "type": "error", "code": "ROOM_NOT_FOUND" }
+{ "type": "error", "code": "ROOM_ARCHIVED" }
+{ "type": "error", "code": "ROOM_FULL" }
 ```
 
-### **leave**
+#### On success (server pushes automatically)
 
-``` json
-{ "type": "leave", "roomId": 1 }
+* Full message history (`chatMessage`)
+* Current room metadata
+* Connected clients list
+* Updated global rooms list
+
+---
+
+### Leave room
+
+#### Client → Server
+
+```json
+{
+  "type": "leaveRoom",
+  "roomId": 1
+}
 ```
 
-### **message**
+Triggers room state updates for all participants.
 
-``` json
-{ "type": "message", "roomId": 1, "content": "text" }
+---
+
+## Messages
+
+### Send message
+
+#### Client → Server
+
+```json
+{
+  "type": "sendMessage",
+  "roomId": 1,
+  "content": "Hello world"
+}
 ```
 
-### **deleteRoom**
+Client **must be joined** to the room.
 
-``` json
-{ "type": "deleteRoom", "roomId": 1 }
+#### Server → Room participants
+
+```json
+{
+  "type": "chatMessage",
+  "data": {
+    "roomId": 1,
+    "id": 42,
+    "userId": "user123",
+    "nickname": "John",
+    "content": "Hello world",
+    "sentAt": "2025-01-01T12:00:00.000Z"
+  }
+}
 ```
 
-------------------------------------------------------------------------
+All messages are persisted.
 
-# 4. Server → Client WebSocket Messages
+---
 
-### **welcome**
+## Room State Streaming
 
-### **history**
+### Room metadata update
 
-### **message**
+Sent to **room participants** whenever state changes.
 
-### **roomUpdate**
+```json
+{
+  "type": "roomData",
+  "data": {
+    "roomId": 1,
+    "name": "Room name",
+    "connectedClientsAmount": 3,
+    "maxClients": 10,
+    "creatorUserId": "user123",
+    "archived": false
+  }
+}
+```
 
-### **roomsListUpdate**
+---
 
-### **roomDeleted**
+### Connected clients list
 
-### **error**
+```json
+{
+  "type": "roomConnectedClients",
+  "data": {
+    "roomId": 1,
+    "clients": [
+      { "id": "user123", "nickname": "John" }
+    ]
+  }
+}
+```
 
-(Full schemas included in original document.)
+---
 
-------------------------------------------------------------------------
+### Room destroyed / archived
 
-# End of Document
+Sent when a room becomes archived due to inactivity.
+
+```json
+{
+  "type": "roomDestroyed",
+  "data": { "roomId": 1 }
+}
+```
+
+Client must leave the room locally.
+
+---
+
+## Automatic Behavior
+
+* Rooms auto-archive after inactivity timeout
+* Any room activity updates last-activity timestamp
+* Join / leave / message triggers global room list update
+* Messages are streamed only to room participants
+
+---
+
+## Error Codes
+
+| Code                 | Meaning                              |
+| -------------------- | ------------------------------------ |
+| UNAUTHORIZED         | Auth message missing or invalid      |
+| AUTH_TIMEOUT         | No auth within 5 seconds             |
+| DUBLICATE_CONNECTION | Another connection replaced this one |
+| ROOM_NOT_FOUND       | Room does not exist                  |
+| ROOM_ARCHIVED        | Room is archived                     |
+| ROOM_FULL            | Room capacity reached                |
+| UNKNOWN_MESSAGE_TYPE | Unsupported message type             |
+
+---
+
+## Notes
+
+* JSON only
+* Order of messages is guaranteed per connection
+* Reconnection requires re-authentication
