@@ -13,6 +13,7 @@ export class MessageRepository {
         message.roomId,
         message.userId,
         message.nickname,
+        message.color,
         message.content,
         message.sentAt
       );
@@ -37,7 +38,15 @@ export class MessageRepository {
       .reverse()
       .map(
         (r: any) =>
-          new Message(r.id, r.roomId, r.userId, r.nickname, r.content, r.sentAt)
+          new Message(
+            r.id,
+            r.roomId,
+            r.userId,
+            r.nickname,
+            r.color,
+            r.content,
+            r.sentAt
+          )
       );
   }
 
@@ -49,7 +58,15 @@ export class MessageRepository {
       .all(roomId);
     return rows.map(
       (r: any) =>
-        new Message(r.id, r.roomId, r.userId, r.nickname, r.content, r.sentAt)
+        new Message(
+          r.id,
+          r.roomId,
+          r.userId,
+          r.nickname,
+          r.color,
+          r.content,
+          r.sentAt
+        )
     );
   }
 }

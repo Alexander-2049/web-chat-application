@@ -12,6 +12,14 @@ export class DatabaseFactory {
     db.pragma("foreign_keys = ON");
 
     db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      nickname TEXT,
+      color TEXT,
+      avatarPath TEXT,
+      connected INTEGER DEFAULT 0,
+      lastSeen TEXT
+    );
     CREATE TABLE IF NOT EXISTS rooms (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -26,6 +34,7 @@ export class DatabaseFactory {
       roomId INTEGER,
       userId TEXT,
       nickname TEXT,
+      color TEXT,
       content TEXT,
       sentAt TEXT,
       FOREIGN KEY (roomId) REFERENCES rooms(id) ON DELETE CASCADE

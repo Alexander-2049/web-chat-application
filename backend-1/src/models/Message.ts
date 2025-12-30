@@ -4,6 +4,7 @@ export class Message {
     public roomId: number,
     public userId: string,
     public nickname: string | null,
+    public color: string | null,
     public content: string,
     public sentAt?: string
   ) {
