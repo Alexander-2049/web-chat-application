@@ -1,26 +1,29 @@
-# WebSocket Chat API
+# Chat WebSocket API – ENDPOINTS.md
 
-**Endpoint:** `ws://<host>/ws/chat`
+Base URL: **[http://localhost:8080](http://localhost:8080)**
+WebSocket Path: **/ws/chat**
 
-This document describes the full WebSocket communication protocol between client and server.
+This document describes the full WebSocket protocol used by the Chat backend. It is intended for frontend developers who will integrate real-time chat functionality.
 
 ---
 
-## Connection Lifecycle
+## 1. Connection
 
-### 1. Connect
-
-Client opens a WebSocket connection to:
+### WebSocket URL
 
 ```
-ws://<host>/ws/chat
+ws://localhost:8080/ws/chat
 ```
 
-### 2. Authentication (required)
+After connection, the client **must authenticate within 5 seconds**, otherwise the server will close the connection.
 
-The very first message **must** be authentication.
+---
 
-#### Client → Server
+## 2. Authentication
+
+### Client → Server
+
+#### `auth`
 
 ```json
 {
@@ -29,10 +32,12 @@ The very first message **must** be authentication.
 }
 ```
 
-* `userId` must be globally unique
-* Only **one active connection per userId** is allowed
+* `userId` must be a unique string
+* If the same `userId` connects again, the previous connection is closed
 
-#### Server → Client (success)
+### Server → Client
+
+#### `auth_ok`
 
 ```json
 {
@@ -41,36 +46,34 @@ The very first message **must** be authentication.
 }
 ```
 
-#### Server → Client (errors)
+#### Possible Errors
 
 ```json
-{ "type": "error", "code": "UNAUTHORIZED" }
-{ "type": "error", "code": "AUTH_TIMEOUT" }
+{
+  "type": "error",
+  "code": "AUTH_TIMEOUT | UNAUTHORIZED"
+}
 ```
-
-#### Duplicate connection handling
-
-If the same `userId` connects again:
-
-```json
-{ "type": "closed", "code": "DUBLICATE_CONNECTION" }
-```
-
-The **previous connection is closed**, the new one becomes active.
 
 ---
 
-## Rooms
+## 3. Global Room Queries
 
-### Get all active rooms
+### Client → Server
 
-#### Client → Server
+#### `getAllRooms`
+
+Requests all **active (non-archived)** rooms.
 
 ```json
-{ "type": "getAllRooms" }
+{
+  "type": "getAllRooms"
+}
 ```
 
-#### Server → Client
+### Server → Client
+
+#### `allActiveRooms`
 
 ```json
 {
@@ -92,15 +95,21 @@ The **previous connection is closed**, the new one becomes active.
 
 ---
 
-### Get all archived rooms
+### Client → Server
 
-#### Client → Server
+#### `getAllArchivedRooms`
+
+Requests all archived rooms.
 
 ```json
-{ "type": "getAllArchivedRooms" }
+{
+  "type": "getAllArchivedRooms"
+}
 ```
 
-#### Server → Client
+### Server → Client
+
+#### `allArchivedRooms`
 
 ```json
 {
@@ -111,77 +120,51 @@ The **previous connection is closed**, the new one becomes active.
         "roomId": 5,
         "name": "Old room",
         "creatorUserId": "user123",
-        "createdAt": "2025-01-01T12:00:00.000Z"
+        "createdAt": "2024-12-01T12:00:00Z"
       }
     ]
   }
 }
 ```
 
-Archived rooms are **read-only**.
-
 ---
 
-### Join room
+## 4. Joining & Leaving Rooms
 
-#### Client → Server
+### Client → Server
+
+#### `joinRoom`
 
 ```json
 {
   "type": "joinRoom",
-  "roomId": 1
-}
-```
-
-#### Possible errors
-
-```json
-{ "type": "error", "code": "ROOM_NOT_FOUND" }
-{ "type": "error", "code": "ROOM_ARCHIVED" }
-{ "type": "error", "code": "ROOM_FULL" }
-```
-
-#### On success (server pushes automatically)
-
-* Full message history (`chatMessage`)
-* Current room metadata
-* Connected clients list
-* Updated global rooms list
-
----
-
-### Leave room
-
-#### Client → Server
-
-```json
-{
-  "type": "leaveRoom",
-  "roomId": 1
-}
-```
-
-Triggers room state updates for all participants.
-
----
-
-## Messages
-
-### Send message
-
-#### Client → Server
-
-```json
-{
-  "type": "sendMessage",
   "roomId": 1,
-  "content": "Hello world"
+  "nickname": "CoolUser"
 }
 ```
 
-Client **must be joined** to the room.
+**Rules:**
 
-#### Server → Room participants
+* `nickname` must be a non-empty string
+* Cannot join archived rooms
+* Cannot exceed room max capacity
+
+#### Possible Errors
+
+```json
+{
+  "type": "error",
+  "code": "NICKNAME_REQUIRED | ROOM_NOT_FOUND | ROOM_ARCHIVED | ROOM_FULL"
+}
+```
+
+---
+
+### Server → Client (on successful join)
+
+#### `chatMessage` (history replay)
+
+Sent for **each stored message** in the room.
 
 ```json
 {
@@ -190,22 +173,20 @@ Client **must be joined** to the room.
     "roomId": 1,
     "id": 42,
     "userId": "user123",
-    "nickname": "John",
-    "content": "Hello world",
-    "sentAt": "2025-01-01T12:00:00.000Z"
+    "nickname": "CoolUser",
+    "content": "Hello!",
+    "sentAt": "2024-12-01T12:05:00Z"
   }
 }
 ```
 
-All messages are persisted.
-
 ---
 
-## Room State Streaming
+## 5. Room State Updates (Server Push)
 
-### Room metadata update
+### `roomData`
 
-Sent to **room participants** whenever state changes.
+Sent to all room participants whenever room state changes.
 
 ```json
 {
@@ -223,7 +204,7 @@ Sent to **room participants** whenever state changes.
 
 ---
 
-### Connected clients list
+### `roomConnectedClients`
 
 ```json
 {
@@ -231,7 +212,10 @@ Sent to **room participants** whenever state changes.
   "data": {
     "roomId": 1,
     "clients": [
-      { "id": "user123", "nickname": "John" }
+      {
+        "id": "user123",
+        "nickname": "CoolUser"
+      }
     ]
   }
 }
@@ -239,46 +223,128 @@ Sent to **room participants** whenever state changes.
 
 ---
 
-### Room destroyed / archived
+## 6. Messaging
 
-Sent when a room becomes archived due to inactivity.
+### Client → Server
+
+#### `sendMessage`
+
+```json
+{
+  "type": "sendMessage",
+  "roomId": 1,
+  "content": "Hello everyone"
+}
+```
+
+* Client **must be joined** to the room
+
+---
+
+### Server → Client
+
+#### `chatMessage`
+
+Broadcast to **all participants** of the room.
+
+```json
+{
+  "type": "chatMessage",
+  "data": {
+    "roomId": 1,
+    "id": 43,
+    "userId": "user456",
+    "nickname": "AnotherUser",
+    "content": "Hi!",
+    "sentAt": "2024-12-01T12:06:00Z"
+  }
+}
+```
+
+---
+
+## 7. Room Archiving
+
+Rooms can be archived automatically or manually.
+
+### Automatic
+
+* If **no activity** occurs for `chatLifeDurationSeconds` (default **120s**)
+
+### Manual (Owner Only)
+
+#### Client → Server
+
+```json
+{
+  "type": "archiveRoom",
+  "roomId": 1
+}
+```
+
+#### Possible Error
+
+```json
+{
+  "type": "error",
+  "code": "NOT_ROOM_OWNER"
+}
+```
+
+---
+
+### Server → Client
+
+#### `roomDestroyed`
+
+Sent to all participants when a room is archived.
 
 ```json
 {
   "type": "roomDestroyed",
-  "data": { "roomId": 1 }
+  "data": {
+    "roomId": 1
+  }
 }
 ```
 
-Client must leave the room locally.
+Clients are automatically removed from the room.
 
 ---
 
-## Automatic Behavior
+## 8. Connection Closure
 
-* Rooms auto-archive after inactivity timeout
-* Any room activity updates last-activity timestamp
-* Join / leave / message triggers global room list update
-* Messages are streamed only to room participants
+### `closed`
 
----
+Sent when a duplicate connection with the same `userId` is detected.
 
-## Error Codes
-
-| Code                 | Meaning                              |
-| -------------------- | ------------------------------------ |
-| UNAUTHORIZED         | Auth message missing or invalid      |
-| AUTH_TIMEOUT         | No auth within 5 seconds             |
-| DUBLICATE_CONNECTION | Another connection replaced this one |
-| ROOM_NOT_FOUND       | Room does not exist                  |
-| ROOM_ARCHIVED        | Room is archived                     |
-| ROOM_FULL            | Room capacity reached                |
-| UNKNOWN_MESSAGE_TYPE | Unsupported message type             |
+```json
+{
+  "type": "closed",
+  "code": "DUBLICATE_CONNECTION"
+}
+```
 
 ---
 
-## Notes
+## 9. Generic Errors
 
-* JSON only
-* Order of messages is guaranteed per connection
-* Reconnection requires re-authentication
+```json
+{
+  "type": "error",
+  "code": "INVALID_JSON | UNKNOWN_MESSAGE_TYPE"
+}
+```
+
+---
+
+## 10. Notes for Frontend Developers
+
+* Expect **server push updates** (room lists, participants, messages)
+* Always handle `roomDestroyed`
+* Re-request `getAllRooms` after reconnect
+* WebSocket messages are **JSON only**
+
+---
+
+**End of document**

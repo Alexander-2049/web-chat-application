@@ -8,6 +8,11 @@ export interface WSSuccessMessage {
   code: string;
 }
 
+export interface WSAuthOkMessage {
+  type: "auth_ok";
+  userId: string;
+}
+
 export interface WSRoomDataMessage {
   type: "roomData";
   data: {
@@ -52,7 +57,7 @@ export interface WSAllArchivedRoomsMessage {
       roomId: number;
       name: string;
       creatorUserId: string;
-      createdAt: string; // new Date().toISOString()
+      createdAt: string;
     }[];
   };
 }
@@ -77,13 +82,14 @@ export interface WSChatMessage {
     userId: string;
     nickname: string;
     content: string;
-    sentAt: string; // new Date().toISOString()
+    sentAt: string;
   };
 }
 
 export type WSOutgoingMessage =
   | WSErrorMessage
   | WSSuccessMessage
+  | WSAuthOkMessage
   | WSRoomDataMessage
   | WSRoomConnectedClientsMessage
   | WSAllActiveRoomsMessage
@@ -94,6 +100,7 @@ export type WSOutgoingMessage =
 
 export class WebsocketMessage<T extends WSOutgoingMessage> {
   constructor(public payload: T) {}
+
   json() {
     return JSON.stringify(this.payload);
   }
