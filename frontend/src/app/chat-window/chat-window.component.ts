@@ -19,7 +19,6 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   @ViewChild('messagesContainer')
   messagesContainer!: ElementRef<HTMLDivElement>;
 
-  // 🔥 signals
   wrapperDegAngle = signal(randomFloat(-1.5, 1.5));
   roomTitle = signal('Chat Room');
   activeUsers = signal(0);
