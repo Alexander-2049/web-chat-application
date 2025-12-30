@@ -1,9 +1,6 @@
 <div class="header-container" [class.ready]="isUserConnected">
   <ul class="urls indie-flower-regular" *ngIf="isUserConnected">
-    <li
-      *ngFor="let item of links"
-      [class.image-loaded]="imagesLoaded[item.icon]"
-    >
+    <li *ngFor="let item of links" [class.image-loaded]="imagesLoaded[item.icon]">
       <a [routerLink]="item.path">
         <img
           [src]="item.icon"
@@ -15,10 +12,7 @@
       </a>
     </li>
     <li class="settings-link">
-      <button
-        (click)="openSettingsModal()"
-        class="settings-btn indie-flower-regular"
-      >
+      <button (click)="openSettingsModal()" class="settings-btn indie-flower-regular">
         <span class="settings-icon">⚙</span>
         <span class="link-text">Settings</span>
       </button>
@@ -35,15 +29,8 @@
 </div>
 
 <!-- Settings modal -->
-<div
-  class="modal-overlay"
-  *ngIf="showSettingsModal"
-  (click)="closeSettingsModal()"
->
-  <div
-    class="modal-paper indie-flower-regular"
-    (click)="$event.stopPropagation()"
-  >
+<div class="modal-overlay" *ngIf="showSettingsModal" (click)="closeSettingsModal()">
+  <div class="modal-paper indie-flower-regular" (click)="$event.stopPropagation()">
     <h2>Settings</h2>
     <form [formGroup]="settingsForm" (ngSubmit)="saveSettings()">
       <div class="form-group">

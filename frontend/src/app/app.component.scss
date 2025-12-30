@@ -4,7 +4,7 @@ main {
   box-sizing: border-box;
   display: grid;
   grid-template-rows: auto 1fr;
-  font-family: "Indie Flower", cursive;
+  font-family: 'Indie Flower', cursive;
 }
 
 .content {
@@ -23,7 +23,7 @@ main {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #f5f3e8 0%, #e8e4d0 100%);
-  font-family: "Indie Flower", cursive;
+  font-family: 'Indie Flower', cursive;
 
   .paper-box {
     background: #fff;

@@ -2,11 +2,7 @@
   class="rooms-wrapper indie-flower-regular"
   [style.transform]="'rotate(' + wrapperDegAngle + 'deg)'"
 >
-  <form
-    [formGroup]="headForm"
-    class="headForm"
-    (ngSubmit)="openCreateRoomModal()"
-  >
+  <form [formGroup]="headForm" class="headForm" (ngSubmit)="openCreateRoomModal()">
     <input
       formControlName="searchCreateInputBar"
       type="text"
@@ -40,15 +36,8 @@
 </div>
 
 <!-- Styled modal with paper-like design -->
-<div
-  class="modal-overlay"
-  *ngIf="showCreateRoomModal"
-  (click)="closeCreateRoomModal()"
->
-  <div
-    class="modal-paper indie-flower-regular"
-    (click)="$event.stopPropagation()"
-  >
+<div class="modal-overlay" *ngIf="showCreateRoomModal" (click)="closeCreateRoomModal()">
+  <div class="modal-paper indie-flower-regular" (click)="$event.stopPropagation()">
     <h2>Create New Room</h2>
     <form [formGroup]="createRoomForm" (ngSubmit)="createRoom()">
       <div class="form-group">

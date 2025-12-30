@@ -1,24 +1,24 @@
-import { Component, OnInit, OnDestroy } from "@angular/core";
-import { Router, RouterOutlet } from "@angular/router";
-import { CommonModule } from "@angular/common";
-import { HeaderComponent } from "./header/header.component";
-import { WebSocketService } from "./services/websocket.service";
-import { UserService } from "./services/user.service";
-import { Subscription } from "rxjs";
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Router, RouterOutlet } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { HeaderComponent } from './header/header.component';
+import { WebSocketService } from './services/websocket.service';
+import { UserService } from './services/user.service';
+import { Subscription } from 'rxjs';
 
 @Component({
-  selector: "app-root",
+  selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet, HeaderComponent, CommonModule],
-  templateUrl: "./app.component.html",
-  styleUrl: "./app.component.scss",
+  templateUrl: './app.component.html',
+  styleUrl: './app.component.scss',
 })
 export class AppComponent implements OnInit, OnDestroy {
-  title = "chat-ng";
+  title = 'chat-ng';
 
   isConnecting = true;
   isConnected = false;
-  connectionError = "";
+  connectionError = '';
   private subscriptions: Subscription[] = [];
 
   constructor(
@@ -42,18 +42,17 @@ export class AppComponent implements OnInit, OnDestroy {
       this.isConnected = true;
 
       // Navigate to rooms list after connection
-      this.router.navigate(["/rooms"]);
+      this.router.navigate(['/rooms']);
     } catch (error) {
-      console.error("[v0] Failed to connect to WebSocket:", error);
+      console.error('[v0] Failed to connect to WebSocket:', error);
       this.isConnecting = false;
-      this.connectionError =
-        "Failed to connect to server. Please refresh the page.";
+      this.connectionError = 'Failed to connect to server. Please refresh the page.';
     }
 
     const connSub = this.wsService.isConnected$.subscribe((connected) => {
       this.isConnected = connected;
       if (!connected && !this.isConnecting) {
-        this.connectionError = "Connection lost. Please refresh the page.";
+        this.connectionError = 'Connection lost. Please refresh the page.';
       }
     });
     this.subscriptions.push(connSub);

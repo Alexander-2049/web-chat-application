@@ -1,4 +1,4 @@
-import { CommonModule } from "@angular/common";
+import { CommonModule } from '@angular/common';
 import {
   Component,
   type ElementRef,
@@ -6,39 +6,32 @@ import {
   type OnInit,
   type AfterViewChecked,
   type OnDestroy,
-} from "@angular/core";
-import {
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from "@angular/forms";
-import { ActivatedRoute, Router } from "@angular/router";
-import { randomFloat } from "../utils/random";
-import { Message } from "../models/api.models";
-import { Subscription } from "rxjs";
-import { WebSocketService } from "../services/websocket.service";
-import { UserService } from "../services/user.service";
+} from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { randomFloat } from '../utils/random';
+import { Message } from '../models/api.models';
+import { Subscription } from 'rxjs';
+import { WebSocketService } from '../services/websocket.service';
+import { UserService } from '../services/user.service';
 
 @Component({
-  selector: "app-chat-window",
+  selector: 'app-chat-window',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
-  templateUrl: "./chat-window.component.html",
-  styleUrl: "./chat-window.component.scss",
+  templateUrl: './chat-window.component.html',
+  styleUrl: './chat-window.component.scss',
 })
-export class ChatWindowComponent
-  implements OnInit, AfterViewChecked, OnDestroy
-{
-  @ViewChild("messagesContainer") messagesContainer!: ElementRef;
+export class ChatWindowComponent implements OnInit, AfterViewChecked, OnDestroy {
+  @ViewChild('messagesContainer') messagesContainer!: ElementRef;
 
   wrapperDegAngle = randomFloat(-1.5, 1.5);
   messageForm = new FormGroup({
-    message: new FormControl("", Validators.required),
+    message: new FormControl('', Validators.required),
   });
 
   isShaking = false;
-  roomTitle = "Chat Room";
+  roomTitle = 'Chat Room';
   activeUsers = 0;
   roomId: number | null = null;
   roomClients: { id: string; nickname: string }[] = [];
@@ -49,7 +42,7 @@ export class ChatWindowComponent
 
   showNicknameModal = true;
   nicknameForm = new FormGroup({
-    nickname: new FormControl("", Validators.required),
+    nickname: new FormControl('', Validators.required),
   });
 
   constructor(
@@ -61,32 +54,30 @@ export class ChatWindowComponent
 
   ngOnInit() {
     this.route.params.subscribe((params) => {
-      const id = params["id"];
+      const id = params['id'];
       if (id) {
         this.roomId = Number.parseInt(id, 10);
 
         // Check if user has a nickname
         const savedNickname = this.userService.getNickname();
         if (savedNickname) {
-          this.nicknameForm.get("nickname")?.setValue(savedNickname);
+          this.nicknameForm.get('nickname')?.setValue(savedNickname);
           this.showNicknameModal = false;
           this.joinRoom(savedNickname);
         }
       }
     });
 
-    const roomDataSub = this.wsService
-      .getMessagesOfType<any>("roomData")
-      .subscribe((msg) => {
-        if (msg.data.roomId === this.roomId) {
-          this.roomTitle = msg.data.name;
-          this.activeUsers = msg.data.connectedClientsAmount;
-        }
-      });
+    const roomDataSub = this.wsService.getMessagesOfType<any>('roomData').subscribe((msg) => {
+      if (msg.data.roomId === this.roomId) {
+        this.roomTitle = msg.data.name;
+        this.activeUsers = msg.data.connectedClientsAmount;
+      }
+    });
     this.subscriptions.push(roomDataSub);
 
     const clientsSub = this.wsService
-      .getMessagesOfType<any>("roomConnectedClients")
+      .getMessagesOfType<any>('roomConnectedClients')
       .subscribe((msg) => {
         if (msg.data.roomId === this.roomId) {
           this.roomClients = msg.data.clients;
@@ -94,44 +85,38 @@ export class ChatWindowComponent
       });
     this.subscriptions.push(clientsSub);
 
-    const messageSub = this.wsService
-      .getMessagesOfType<any>("chatMessage")
-      .subscribe((msg) => {
-        if (msg.data.roomId === this.roomId) {
-          this.messages.push({
-            id: msg.data.id,
-            roomId: msg.data.roomId,
-            userId: msg.data.userId,
-            nickname: msg.data.nickname,
-            content: msg.data.content,
-            sentAt: msg.data.sentAt,
-          });
-          this.shouldScrollToBottom = true;
-        }
-      });
+    const messageSub = this.wsService.getMessagesOfType<any>('chatMessage').subscribe((msg) => {
+      if (msg.data.roomId === this.roomId) {
+        this.messages.push({
+          id: msg.data.id,
+          roomId: msg.data.roomId,
+          userId: msg.data.userId,
+          nickname: msg.data.nickname,
+          content: msg.data.content,
+          sentAt: msg.data.sentAt,
+        });
+        this.shouldScrollToBottom = true;
+      }
+    });
     this.subscriptions.push(messageSub);
 
-    const destroyedSub = this.wsService
-      .getMessagesOfType<any>("roomDestroyed")
-      .subscribe((msg) => {
-        if (msg.data.roomId === this.roomId) {
-          alert("This room has been archived.");
-          this.router.navigate(["/rooms"]);
-        }
-      });
+    const destroyedSub = this.wsService.getMessagesOfType<any>('roomDestroyed').subscribe((msg) => {
+      if (msg.data.roomId === this.roomId) {
+        alert('This room has been archived.');
+        this.router.navigate(['/rooms']);
+      }
+    });
     this.subscriptions.push(destroyedSub);
 
-    const errorSub = this.wsService
-      .getMessagesOfType<any>("error")
-      .subscribe((msg) => {
-        console.error("[v0] Error from server:", msg.code);
-        if (msg.code === "ROOM_NOT_FOUND" || msg.code === "ROOM_ARCHIVED") {
-          alert(`Error: ${msg.code}`);
-          this.router.navigate(["/rooms"]);
-        } else if (msg.code === "NICKNAME_REQUIRED") {
-          this.showNicknameModal = true;
-        }
-      });
+    const errorSub = this.wsService.getMessagesOfType<any>('error').subscribe((msg) => {
+      console.error('[v0] Error from server:', msg.code);
+      if (msg.code === 'ROOM_NOT_FOUND' || msg.code === 'ROOM_ARCHIVED') {
+        alert(`Error: ${msg.code}`);
+        this.router.navigate(['/rooms']);
+      } else if (msg.code === 'NICKNAME_REQUIRED') {
+        this.showNicknameModal = true;
+      }
+    });
     this.subscriptions.push(errorSub);
   }
 
@@ -147,8 +132,8 @@ export class ChatWindowComponent
   }
 
   submitNickname() {
-    const nickname = this.nicknameForm.get("nickname")?.value;
-    if (!nickname || nickname.trim() === "") {
+    const nickname = this.nicknameForm.get('nickname')?.value;
+    if (!nickname || nickname.trim() === '') {
       return;
     }
 
@@ -159,7 +144,7 @@ export class ChatWindowComponent
 
   private joinRoom(nickname: string) {
     if (this.roomId) {
-      console.log("[v0] Joining room", this.roomId, "with nickname", nickname);
+      console.log('[v0] Joining room', this.roomId, 'with nickname', nickname);
       this.wsService.joinRoom(this.roomId, nickname);
     }
   }
@@ -178,8 +163,8 @@ export class ChatWindowComponent
 
   formatTimestamp(isoString: string): string {
     const date = new Date(isoString);
-    const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = date.getMinutes().toString().padStart(2, "0");
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;
   }
 
@@ -199,16 +184,16 @@ export class ChatWindowComponent
   }
 
   submitMessage() {
-    const message = this.messageForm.get("message");
+    const message = this.messageForm.get('message');
     if (message === null || message.value === null) return;
-    if (message.hasError("required") || message.value.trim() === "") {
+    if (message.hasError('required') || message.value.trim() === '') {
       this.triggerShake();
       return;
     }
 
     if (this.roomId) {
       this.wsService.sendMessage(this.roomId, message.value);
-      message.setValue("");
+      message.setValue('');
     }
 
     setTimeout(() => {

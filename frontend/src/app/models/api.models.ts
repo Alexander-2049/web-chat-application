@@ -44,58 +44,58 @@ export interface WSMessage {
 
 // Outgoing messages (client -> server)
 export interface WSRequestUserIdMessage {
-  type: "requestUserId";
+  type: 'requestUserId';
 }
 
 export interface WSAuthMessage {
-  type: "auth";
+  type: 'auth';
   userId: string;
 }
 
 export interface WSGetAllRoomsMessage {
-  type: "getAllRooms";
+  type: 'getAllRooms';
 }
 
 export interface WSGetAllArchivedRoomsMessage {
-  type: "getAllArchivedRooms";
+  type: 'getAllArchivedRooms';
 }
 
 export interface WSJoinRoomMessage {
-  type: "joinRoom";
+  type: 'joinRoom';
   roomId: number;
   nickname: string;
 }
 
 export interface WSArchiveRoomMessage {
-  type: "archiveRoom";
+  type: 'archiveRoom';
   roomId: number;
 }
 
 export interface WSSendMessageMessage {
-  type: "sendMessage";
+  type: 'sendMessage';
   roomId: number;
   content: string;
 }
 
 export interface WSCreateRoomMessage {
-  type: "createRoom";
+  type: 'createRoom';
   name: string;
   maxParticipants: number | null;
 }
 
 // Incoming messages (server -> client)
 export interface WSUserIdIssuedMessage {
-  type: "userIdIssued";
+  type: 'userIdIssued';
   userId: string;
 }
 
 export interface WSAuthOkMessage {
-  type: "auth_ok";
+  type: 'auth_ok';
   userId: string;
 }
 
 export interface WSRoomDataMessage {
-  type: "roomData";
+  type: 'roomData';
   data: {
     roomId: number;
     name: string;
@@ -107,7 +107,7 @@ export interface WSRoomDataMessage {
 }
 
 export interface WSRoomConnectedClientsMessage {
-  type: "roomConnectedClients";
+  type: 'roomConnectedClients';
   data: {
     roomId: number;
     clients: {
@@ -118,7 +118,7 @@ export interface WSRoomConnectedClientsMessage {
 }
 
 export interface WSAllActiveRoomsMessage {
-  type: "allActiveRooms";
+  type: 'allActiveRooms';
   data: {
     rooms: {
       roomId: number;
@@ -132,7 +132,7 @@ export interface WSAllActiveRoomsMessage {
 }
 
 export interface WSAllArchivedRoomsMessage {
-  type: "allArchivedRooms";
+  type: 'allArchivedRooms';
   data: {
     rooms: {
       roomId: number;
@@ -144,19 +144,19 @@ export interface WSAllArchivedRoomsMessage {
 }
 
 export interface WSRoomDestroyedMessage {
-  type: "roomDestroyed";
+  type: 'roomDestroyed';
   data: {
     roomId: number;
   };
 }
 
 export interface WSClosedMessage {
-  type: "closed";
-  code: "DUBLICATE_CONNECTION";
+  type: 'closed';
+  code: 'DUBLICATE_CONNECTION';
 }
 
 export interface WSChatMessageMessage {
-  type: "chatMessage";
+  type: 'chatMessage';
   data: {
     roomId: number;
     id: number;
@@ -168,11 +168,11 @@ export interface WSChatMessageMessage {
 }
 
 export interface WSErrorMessage {
-  type: "error";
+  type: 'error';
   code: string;
 }
 
 export interface WSSuccessMessage {
-  type: "success";
+  type: 'success';
   code: string;
 }

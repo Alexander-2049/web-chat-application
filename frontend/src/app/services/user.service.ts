@@ -1,5 +1,5 @@
-import { Injectable } from "@angular/core";
-import { BehaviorSubject, Observable } from "rxjs";
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable } from 'rxjs';
 
 export interface User {
   userId: string;
@@ -7,20 +7,19 @@ export interface User {
 }
 
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root',
 })
 export class UserService {
   private currentUserSubject = new BehaviorSubject<User | null>(null);
-  public currentUser$: Observable<User | null> =
-    this.currentUserSubject.asObservable();
+  public currentUser$: Observable<User | null> = this.currentUserSubject.asObservable();
 
   constructor() {
     this.loadUserFromStorage();
   }
 
   private loadUserFromStorage(): void {
-    const userId = localStorage.getItem("userId");
-    const nickname = localStorage.getItem("nickname");
+    const userId = localStorage.getItem('userId');
+    const nickname = localStorage.getItem('nickname');
 
     if (userId) {
       this.currentUserSubject.next({
@@ -31,9 +30,9 @@ export class UserService {
   }
 
   setUser(user: User): void {
-    localStorage.setItem("userId", user.userId);
+    localStorage.setItem('userId', user.userId);
     if (user.nickname) {
-      localStorage.setItem("nickname", user.nickname);
+      localStorage.setItem('nickname', user.nickname);
     }
     this.currentUserSubject.next(user);
   }
@@ -42,7 +41,7 @@ export class UserService {
     const user = this.currentUserSubject.value;
     if (user) {
       user.nickname = nickname;
-      localStorage.setItem("nickname", nickname);
+      localStorage.setItem('nickname', nickname);
       this.currentUserSubject.next(user);
     }
   }
@@ -52,16 +51,11 @@ export class UserService {
   }
 
   getUserId(): string | null {
-    return (
-      this.currentUserSubject.value?.userId || localStorage.getItem("userId")
-    );
+    return this.currentUserSubject.value?.userId || localStorage.getItem('userId');
   }
 
   getNickname(): string | null {
-    return (
-      this.currentUserSubject.value?.nickname ||
-      localStorage.getItem("nickname")
-    );
+    return this.currentUserSubject.value?.nickname || localStorage.getItem('nickname');
   }
 
   isProfileComplete(): boolean {
@@ -70,8 +64,8 @@ export class UserService {
   }
 
   clearUser(): void {
-    localStorage.removeItem("userId");
-    localStorage.removeItem("nickname");
+    localStorage.removeItem('userId');
+    localStorage.removeItem('nickname');
     this.currentUserSubject.next(null);
   }
 }
