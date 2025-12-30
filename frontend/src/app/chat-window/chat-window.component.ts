@@ -1,80 +1,127 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, ViewChild, OnInit, OnDestroy, signal, effect } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  OnInit,
+  HostListener,
+  signal,
+  effect,
+  computed,
+  DestroyRef,
+  inject,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { randomFloat } from '../utils/random';
 import { Message } from '../models/api.models';
-import { Subscription } from 'rxjs';
 import { WebSocketService } from '../services/websocket.service';
 import { UserService } from '../services/user.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-chat-window',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './chat-window.component.html',
-  styleUrl: './chat-window.component.scss',
+  styleUrls: ['./chat-window.component.scss'],
 })
-export class ChatWindowComponent implements OnInit, OnDestroy {
-  @ViewChild('messagesContainer')
-  messagesContainer!: ElementRef<HTMLDivElement>;
+export class ChatWindowComponent implements OnInit {
+  @ViewChild('messagesContainer') messagesContainer!: ElementRef<HTMLDivElement>;
 
-  wrapperDegAngle = signal(randomFloat(-1.5, 1.5));
-  roomTitle = signal('Chat Room');
-  activeUsers = signal(0);
-  messages = signal<Message[]>([]);
-  showNicknameModal = signal(true);
-  isShaking = signal(false);
+  // 🔥 Signals
+  readonly wrapperDegAngle = signal(randomFloat(-1.5, 1.5));
+  readonly roomTitle = signal('Chat Room');
+  readonly activeUsers = signal(0);
+  readonly messages = signal<Message[]>([]);
+  readonly showJoinModal = signal(false);
+  readonly showNicknameModal = signal(true);
+  readonly isShaking = signal(false);
+  readonly roomData = signal<any>(null);
+  readonly connectedClients = signal<{ id: string; nickname: string }[]>([]);
+  readonly isWideScreen = signal(window.innerWidth > 1400);
 
-  roomId: number | null = null;
-
-  messageForm = new FormGroup({
-    message: new FormControl('', Validators.required),
-  });
-
-  nicknameForm = new FormGroup({
+  readonly nicknameForm = new FormGroup({
     nickname: new FormControl('', Validators.required),
   });
 
-  private subscriptions: Subscription[] = [];
+  readonly messageForm = new FormGroup({
+    message: new FormControl('', Validators.required),
+  });
 
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private wsService: WebSocketService,
-    private userService: UserService
-  ) {
-    // 🔥 auto-scroll effect
+  roomId: number | null = null;
+
+  // Services
+  public readonly userService = inject(UserService);
+  private readonly wsService = inject(WebSocketService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+
+  // Computed
+  readonly isRoomCreator = computed(() => {
+    const data = this.roomData();
+    return data ? data.creatorUserId === this.userService.getUserId() : false;
+  });
+
+  constructor() {
+    // 🔥 Auto-scroll effect
     effect(() => {
       this.messages();
       queueMicrotask(() => this.scrollToBottom());
     });
   }
 
-  ngOnInit() {
-    this.route.params.subscribe((params) => {
+  @HostListener('window:resize')
+  onResize() {
+    this.isWideScreen.set(window.innerWidth > 1400);
+  }
+
+  ngOnInit(): void {
+    this.route.params.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params['id'];
       if (!id) return;
 
       this.roomId = Number(id);
 
       const savedNickname = this.userService.getNickname();
-      if (savedNickname) {
+      const savedUserId = this.userService.getUserId();
+
+      if (savedNickname && savedUserId) {
         this.nicknameForm.get('nickname')?.setValue(savedNickname);
         this.showNicknameModal.set(false);
-        this.joinRoom(savedNickname);
+        this.showJoinModal.set(true);
       }
     });
 
-    this.subscriptions.push(
-      this.wsService.getMessagesOfType<any>('roomData').subscribe((msg) => {
+    this.registerWebSocketListeners();
+  }
+
+  private registerWebSocketListeners() {
+    this.wsService
+      .getMessagesOfType<any>('roomData')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((msg) => {
         if (msg.data.roomId === this.roomId) {
+          this.roomData.set(msg.data);
           this.roomTitle.set(msg.data.name);
           this.activeUsers.set(msg.data.connectedClientsAmount);
         }
-      }),
+      });
 
-      this.wsService.getMessagesOfType<any>('chatMessage').subscribe((msg) => {
+    this.wsService
+      .getMessagesOfType<any>('roomConnectedClients')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((msg) => {
+        if (msg.data.roomId === this.roomId) {
+          this.connectedClients.set(msg.data.clients);
+        }
+      });
+
+    this.wsService
+      .getMessagesOfType<any>('chatMessage')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((msg) => {
         if (msg.data.roomId === this.roomId) {
           this.messages.update((list) => [
             ...list,
@@ -88,33 +135,42 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
             },
           ]);
         }
-      }),
+      });
 
-      this.wsService.getMessagesOfType<any>('roomDestroyed').subscribe((msg) => {
+    this.wsService
+      .getMessagesOfType<any>('roomDestroyed')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((msg) => {
         if (msg.data.roomId === this.roomId) {
           alert('This room has been archived.');
           this.router.navigate(['/rooms']);
         }
-      }),
+      });
 
-      this.wsService.getMessagesOfType<any>('error').subscribe((msg) => {
+    this.wsService
+      .getMessagesOfType<any>('error')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((msg) => {
         if (msg.code === 'ROOM_NOT_FOUND' || msg.code === 'ROOM_ARCHIVED') {
           alert(`Error: ${msg.code}`);
           this.router.navigate(['/rooms']);
         } else if (msg.code === 'NICKNAME_REQUIRED') {
           this.showNicknameModal.set(true);
         }
-      })
-    );
+      });
   }
 
-  ngOnDestroy() {
-    this.subscriptions.forEach((s) => s.unsubscribe());
+  // ✅ User Actions
+  joinChatFromModal() {
+    const nickname = this.nicknameForm.get('nickname')?.value;
+    if (!nickname?.trim()) return;
+
+    this.showJoinModal.set(false);
+    this.joinRoom(nickname);
   }
 
   submitNickname() {
     const nickname = this.nicknameForm.get('nickname')?.value;
-
     if (!nickname?.trim()) return;
 
     this.userService.setNickname(nickname);
@@ -135,12 +191,18 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     }
   }
 
-  private joinRoom(nickname: string) {
-    if (this.roomId) {
-      this.wsService.joinRoom(this.roomId, nickname);
+  goToRoomsList() {
+    this.router.navigate(['/rooms']);
+  }
+
+  archiveRoom() {
+    if (!this.roomId) return;
+    if (confirm('Are you sure you want to archive this room?')) {
+      this.wsService.archiveRoom(this.roomId);
     }
   }
 
+  // ✅ Helpers
   shouldShowNickname(index: number): boolean {
     const msgs = this.messages();
     if (index === 0) return true;
@@ -167,5 +229,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   private scrollToBottom() {
     const el = this.messagesContainer?.nativeElement;
     if (el) el.scrollTop = el.scrollHeight;
+  }
+
+  private joinRoom(nickname: string) {
+    if (this.roomId) this.wsService.joinRoom(this.roomId, nickname);
   }
 }
