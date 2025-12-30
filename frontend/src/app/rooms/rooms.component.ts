@@ -23,8 +23,8 @@ export class RoomsComponent implements OnInit, OnDestroy {
   errorMessage = signal('');
   showCreateRoomModal = signal(false);
 
-  headForm = new FormGroup({
-    searchCreateInputBar: new FormControl('', Validators.required),
+  searchForm = new FormGroup({
+    search: new FormControl(''),
   });
 
   createRoomForm = new FormGroup({
@@ -34,7 +34,7 @@ export class RoomsComponent implements OnInit, OnDestroy {
 
   // 🔥 computed rooms list
   filteredRooms = computed(() => {
-    const search = this.headForm.get('searchCreateInputBar')?.value?.toLowerCase() || '';
+    const search = this.searchForm.get('search')?.value?.toLowerCase() || '';
 
     if (!search) {
       return this.rooms();
@@ -61,7 +61,7 @@ export class RoomsComponent implements OnInit, OnDestroy {
         this.rooms.update((rooms) => rooms.filter((r) => r.roomId !== msg.data.roomId));
       });
 
-    const searchSub = this.headForm.get('searchCreateInputBar')?.valueChanges.subscribe(() => {
+    const searchSub = this.searchForm.get('search')?.valueChanges.subscribe(() => {
       /* computed сам пересчитается */
     });
 
@@ -83,13 +83,11 @@ export class RoomsComponent implements OnInit, OnDestroy {
   }
 
   openCreateRoomModal() {
-    const roomName = this.headForm.get('searchCreateInputBar')?.value;
-
-    if (roomName?.trim()) {
-      this.createRoomForm.get('roomName')?.setValue(roomName);
-    }
-
     this.showCreateRoomModal.set(true);
+    setTimeout(() => {
+      const input = document.getElementById('roomNameInput') as HTMLInputElement;
+      if (input) input.focus();
+    }, 100);
   }
 
   closeCreateRoomModal() {
@@ -108,7 +106,7 @@ export class RoomsComponent implements OnInit, OnDestroy {
     this.wsService.createRoom(roomName, maxParticipants || null);
 
     this.closeCreateRoomModal();
-    this.headForm.get('searchCreateInputBar')?.setValue('');
+    this.searchForm.get('search')?.setValue('');
 
     setTimeout(() => this.wsService.getAllRooms(), 500);
   }

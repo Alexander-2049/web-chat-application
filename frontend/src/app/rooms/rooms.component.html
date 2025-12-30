@@ -2,20 +2,21 @@
   class="rooms-wrapper indie-flower-regular"
   [style.transform]="'rotate(' + wrapperDegAngle() + 'deg)'"
 >
-  <form [formGroup]="headForm" class="headForm" (ngSubmit)="openCreateRoomModal()">
-    <input
-      formControlName="searchCreateInputBar"
-      type="text"
-      placeholder="Search/Create room"
-      class="indie-flower-regular"
-    />
-    <button
-      [disabled]="headForm.get('searchCreateInputBar')?.hasError('required')"
-      class="indie-flower-regular"
-    >
-      Create
+  <!-- Split search and create into separate controls -->
+  <div class="header-controls">
+    <form [formGroup]="searchForm" class="search-form">
+      <input
+        formControlName="search"
+        type="text"
+        placeholder="Search rooms..."
+        class="indie-flower-regular"
+      />
+    </form>
+
+    <button class="create-room-btn indie-flower-regular" (click)="openCreateRoomModal()">
+      Create Room
     </button>
-  </form>
+  </div>
 
   @if (isLoading()) {
   <div class="loading-message">Loading rooms...</div>
@@ -45,9 +46,9 @@
 
     <form [formGroup]="createRoomForm" (ngSubmit)="createRoom()">
       <div class="form-group">
-        <label for="roomName">Room Name</label>
+        <label for="roomNameInput">Room Name</label>
         <input
-          id="roomName"
+          id="roomNameInput"
           formControlName="roomName"
           type="text"
           placeholder="Enter room name"

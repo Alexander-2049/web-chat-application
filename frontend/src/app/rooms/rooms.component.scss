@@ -26,26 +26,28 @@
   padding: 16px;
   box-sizing: border-box;
 
-  .headForm {
+  .header-controls {
     display: flex;
-    flex-direction: row;
-    gap: 4px;
+    gap: 12px;
     justify-content: center;
-    flex-wrap: nowrap;
-
+    align-items: center;
     border-bottom: 2px solid #3d3d3d;
     padding-bottom: 16px;
-    overflow: visible;
-
     border-bottom-right-radius: 250px 10px;
     border-bottom-left-radius: 1000px 10px;
+    flex-wrap: wrap;
+  }
+
+  .search-form {
+    flex: 1;
+    min-width: 250px;
+    max-width: 500px;
+    display: flex;
 
     input {
+      width: 100%;
       height: 40px;
-      flex: 1;
-      min-width: 150px;
-      max-width: 256px;
-      font-size: 28px;
+      font-size: 24px;
       border: 2px solid #3d3d3d;
       margin-top: 2px;
       font-family: inherit;
@@ -56,7 +58,7 @@
       border-bottom-left-radius: 2000px 50px;
 
       box-sizing: border-box;
-      padding: 4px 8px;
+      padding: 4px 16px;
 
       &:focus {
         border-color: #000000;
@@ -69,44 +71,37 @@
         border-bottom-left-radius: 1500px 80px;
       }
     }
+  }
 
-    button,
-    input[type="submit"],
-    input[type="reset"] {
-      background: none;
-      color: inherit;
-      border: transparent;
-      padding: 0;
-      cursor: pointer;
-      outline: inherit;
-      font-family: inherit;
+  .create-room-btn {
+    background-color: #4a90e2;
+    color: white;
+    height: 40px;
+    box-sizing: border-box;
+    padding: 4px 24px;
+    font-size: 24px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border: 3px solid #2c2c2c;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 4px 4px 0 rgba(44, 44, 44, 0.2);
+
+    border-top-left-radius: 190px 15px;
+    border-top-right-radius: 15px 285px;
+    border-bottom-right-radius: 215px 15px;
+    border-bottom-left-radius: 15px 205px;
+
+    &:hover {
+      background-color: #357abd;
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.2);
     }
 
-    button {
-      background-color: #e7e7e7;
-      height: 40px;
-      box-sizing: border-box;
-      padding: 4px 8px;
-      font-size: 28px;
-      transition: all 0.2s ease;
-      white-space: nowrap;
-      flex-shrink: 0;
-
-      border-top-left-radius: 190px 15px;
-      border-top-right-radius: 15px 285px;
-      border-bottom-right-radius: 215px 15px;
-      border-bottom-left-radius: 15px 205px;
-
-      &:hover:not(:disabled) {
-        background-color: #d0d0d0;
-        transform: scale(1.05) rotate(-0.5deg);
-      }
-
-      &:disabled {
-        cursor: not-allowed;
-        background-color: #e7e7e769;
-        color: #585858;
-      }
+    &:active {
+      transform: translate(4px, 4px);
+      box-shadow: none;
     }
   }
 
