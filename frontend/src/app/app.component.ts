@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HeaderComponent } from './header/header.component';
@@ -16,9 +16,11 @@ import { Subscription } from 'rxjs';
 export class AppComponent implements OnInit, OnDestroy {
   title = 'chat-ng';
 
-  isConnecting = true;
-  isConnected = false;
-  connectionError = '';
+  // 🔥 Signals вместо обычных полей
+  isConnecting = signal(true);
+  isConnected = signal(false);
+  connectionError = signal('');
+
   private subscriptions: Subscription[] = [];
 
   constructor(
@@ -38,23 +40,26 @@ export class AppComponent implements OnInit, OnDestroy {
         await this.wsService.connect(userId);
       }
 
-      this.isConnecting = false;
-      this.isConnected = true;
+      this.isConnecting.set(false);
+      this.isConnected.set(true);
 
       // Navigate to rooms list after connection
       this.router.navigate(['/rooms']);
     } catch (error) {
       console.error('[v0] Failed to connect to WebSocket:', error);
-      this.isConnecting = false;
-      this.connectionError = 'Failed to connect to server. Please refresh the page.';
+
+      this.isConnecting.set(false);
+      this.connectionError.set('Failed to connect to server. Please refresh the page.');
     }
 
     const connSub = this.wsService.isConnected$.subscribe((connected) => {
-      this.isConnected = connected;
-      if (!connected && !this.isConnecting) {
-        this.connectionError = 'Connection lost. Please refresh the page.';
+      this.isConnected.set(connected);
+
+      if (!connected && !this.isConnecting()) {
+        this.connectionError.set('Connection lost. Please refresh the page.');
       }
     });
+
     this.subscriptions.push(connSub);
   }
 
