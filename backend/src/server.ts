@@ -28,6 +28,26 @@ async function main() {
   const chatServer = new ChatServer(server, roomRepo, messageRepo);
   chatServer.setup();
 
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (isProd) {
+    const frontendPath = path.join(
+      __dirname,
+      "..",
+      "..",
+      "frontend",
+      "dist",
+      "chat-app",
+      "browser"
+    );
+
+    app.use(express.static(frontendPath));
+
+    app.get("*", (_, res) => {
+      res.sendFile(path.join(frontendPath, "index.html"));
+    });
+  }
+
   const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
   server.listen(PORT, () =>
     console.log(`Server running at http://localhost:${PORT}`)

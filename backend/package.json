@@ -4,9 +4,9 @@
   "description": "Chat backend (OOP) for Individual Project (TypeScript, Node.js, SQLite, WebSocket)",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "cross-env NODE_ENV=development ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "cross-env NODE_ENV=production node dist/server.js"
   },
   "dependencies": {
     "@types/cors": "^2.8.19",
@@ -27,6 +27,7 @@
     "@types/node": "^18.16.19",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.4",
+    "cross-env": "^7.0.3",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.0"
   }
