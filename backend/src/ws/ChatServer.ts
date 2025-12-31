@@ -14,7 +14,7 @@ type ClientConnection = {
   userId: string;
   ws: WebSocket;
   roomId: number | null;
-  nicknames: Map<number, string>; // roomId -> nickname
+  nicknames: Map<number, string>;
 };
 
 export class ChatServer {
@@ -175,14 +175,24 @@ export class ChatServer {
   }
 
   private onClose(conn: ClientConnection) {
-    const roomId = conn.roomId || -1;
-    const participants = this.roomConnectedClients.get(roomId);
-    if (participants) {
-      participants.delete(conn.userId);
-      this.streamRoomStateToParticipants(roomId);
-      this.touchRoom(roomId);
+    const current = this.clients.get(conn.userId);
+
+    if (current !== conn) {
+      return;
     }
+
+    const roomId = conn.roomId;
+    if (roomId !== null) {
+      const participants = this.roomConnectedClients.get(roomId);
+      if (participants) {
+        participants.delete(conn.userId);
+        this.streamRoomStateToParticipants(roomId);
+        this.touchRoom(roomId);
+      }
+    }
+
     this.clients.delete(conn.userId);
+    console.log(`[WS] Client fully removed: ${conn.userId}`);
   }
 
   private send(ws: WebSocket, msg: WebsocketMessage<WSOutgoingMessage>) {
