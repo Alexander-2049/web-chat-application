@@ -13,7 +13,7 @@ import { Message } from "../models/Message";
 type ClientConnection = {
   userId: string;
   ws: WebSocket;
-  rooms: Set<number>;
+  roomId: number | null;
   nicknames: Map<number, string>; // roomId -> nickname
 };
 
@@ -77,7 +77,7 @@ export class ChatServer {
             data: { roomId },
           })
         );
-        client.rooms.delete(roomId);
+        client.roomId = null;
         client.nicknames.delete(roomId);
       }
       this.roomConnectedClients.delete(roomId);
@@ -142,7 +142,7 @@ export class ChatServer {
           conn = {
             userId: msg.userId,
             ws,
-            rooms: new Set(),
+            roomId: null,
             nicknames: new Map(),
           };
 
@@ -175,13 +175,12 @@ export class ChatServer {
   }
 
   private onClose(conn: ClientConnection) {
-    for (const roomId of conn.rooms) {
-      const participants = this.roomConnectedClients.get(roomId);
-      if (participants) {
-        participants.delete(conn.userId);
-        this.streamRoomStateToParticipants(roomId);
-        this.touchRoom(roomId);
-      }
+    const roomId = conn.roomId || -1;
+    const participants = this.roomConnectedClients.get(roomId);
+    if (participants) {
+      participants.delete(conn.userId);
+      this.streamRoomStateToParticipants(roomId);
+      this.touchRoom(roomId);
     }
     this.clients.delete(conn.userId);
   }
@@ -257,7 +256,7 @@ export class ChatServer {
         }
 
         participants.set(conn.userId, conn);
-        conn.rooms.add(roomId);
+        conn.roomId = roomId;
         conn.nicknames.set(roomId, nickname);
 
         for (const m of this.msgRepo.findAllByRoom(roomId)) {
@@ -360,7 +359,7 @@ export class ChatServer {
           );
         }
 
-        if (!conn.rooms.has(roomId)) {
+        if (conn.roomId !== roomId) {
           return this.send(
             conn.ws,
             new WebsocketMessage({
