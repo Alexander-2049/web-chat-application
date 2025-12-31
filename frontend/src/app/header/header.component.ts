@@ -38,7 +38,7 @@ export class HeaderComponent implements OnInit {
     {
       title: 'Archive',
       path: 'archive',
-      icon: 'assets/archive-icon.png',
+      icon: 'assets/archive-icon.jpg',
     },
   ];
 
