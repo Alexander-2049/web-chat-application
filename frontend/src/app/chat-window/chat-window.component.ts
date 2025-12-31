@@ -29,13 +29,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 export class ChatWindowComponent implements OnInit {
   @ViewChild('messagesContainer') messagesContainer!: ElementRef<HTMLDivElement>;
 
-  // 🔥 Signals
   readonly wrapperDegAngle = signal(randomFloat(-1.5, 1.5));
   readonly roomTitle = signal('Chat Room');
   readonly activeUsers = signal(0);
   readonly messages = signal<Message[]>([]);
   readonly showJoinModal = signal(false);
-  readonly showNicknameModal = signal(true);
+  readonly showNicknameModal = signal(false);
   readonly isShaking = signal(false);
   readonly roomData = signal<any>(null);
   readonly connectedClients = signal<{ id: string; nickname: string }[]>([]);
@@ -50,26 +49,27 @@ export class ChatWindowComponent implements OnInit {
   });
 
   roomId: number | null = null;
+  private isDirectNavigation = false;
 
-  // Services
   public readonly userService = inject(UserService);
   private readonly wsService = inject(WebSocketService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
-  // Computed
   readonly isRoomCreator = computed(() => {
     const data = this.roomData();
     return data ? data.creatorUserId === this.userService.getUserId() : false;
   });
 
   constructor() {
-    // 🔥 Auto-scroll effect
     effect(() => {
       this.messages();
       queueMicrotask(() => this.scrollToBottom());
     });
+
+    const navigation = this.router.getCurrentNavigation();
+    this.isDirectNavigation = !navigation?.previousNavigation;
   }
 
   @HostListener('window:resize')
@@ -87,10 +87,21 @@ export class ChatWindowComponent implements OnInit {
       const savedNickname = this.userService.getNickname();
       const savedUserId = this.userService.getUserId();
 
-      if (savedNickname && savedUserId) {
+      if (!savedNickname || !savedUserId) {
+        // No credentials - show nickname form first
+        this.showNicknameModal.set(true);
+        this.showJoinModal.set(false);
+      } else if (this.isDirectNavigation) {
+        // Direct URL access with credentials - show join confirmation popup
         this.nicknameForm.get('nickname')?.setValue(savedNickname);
         this.showNicknameModal.set(false);
         this.showJoinModal.set(true);
+      } else {
+        // Clicked from rooms list - join immediately
+        this.nicknameForm.get('nickname')?.setValue(savedNickname);
+        this.showNicknameModal.set(false);
+        this.showJoinModal.set(false);
+        this.joinRoom(savedNickname);
       }
     });
 
@@ -201,7 +212,6 @@ export class ChatWindowComponent implements OnInit {
     }
   }
 
-  // ✅ Helpers
   shouldShowNickname(index: number): boolean {
     const msgs = this.messages();
     if (index === 0) return true;

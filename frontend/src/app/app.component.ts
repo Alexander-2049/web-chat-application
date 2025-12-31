@@ -16,18 +16,20 @@ import { Subscription } from 'rxjs';
 export class AppComponent implements OnInit, OnDestroy {
   title = 'chat-ng';
 
-  // 🔥 Signals вместо обычных полей
   isConnecting = signal(true);
   isConnected = signal(false);
   connectionError = signal('');
 
   private subscriptions: Subscription[] = [];
+  private initialUrl = '';
 
   constructor(
     private wsService: WebSocketService,
     private userService: UserService,
     private router: Router
-  ) {}
+  ) {
+    this.initialUrl = this.router.url;
+  }
 
   async ngOnInit() {
     try {
@@ -43,8 +45,10 @@ export class AppComponent implements OnInit, OnDestroy {
       this.isConnecting.set(false);
       this.isConnected.set(true);
 
-      // Navigate to rooms list after connection
-      this.router.navigate(['/rooms']);
+      const currentPath = window.location.pathname;
+      if (currentPath === '/' || currentPath === '') {
+        this.router.navigate(['/rooms']);
+      }
     } catch (error) {
       console.error('[v0] Failed to connect to WebSocket:', error);
 
