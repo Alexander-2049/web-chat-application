@@ -1,0 +1,32 @@
+<div class="archive-container">
+  <div class="archive-paper indie-flower-regular">
+    <h1 class="archive-title">Archived Rooms</h1>
+
+    @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading archived rooms...</p>
+    </div>
+    } @else if (archivedRooms().length === 0) {
+    <div class="empty-state">
+      <p>No archived rooms yet</p>
+    </div>
+    } @else {
+    <div class="rooms-list">
+      @for (room of archivedRooms(); track room.roomId) {
+      <div class="room-card">
+        <div class="room-info">
+          <h3 class="room-name">{{ room.name }}</h3>
+          <p class="room-meta">
+            <span class="room-id">Room #{{ room.roomId }}</span>
+            <span class="separator">•</span>
+            <span class="room-date">{{ formatDate(room.createdAt) }}</span>
+          </p>
+        </div>
+        <button class="view-btn indie-flower-regular" (click)="viewRoom(room.roomId)">View</button>
+      </div>
+      }
+    </div>
+    }
+  </div>
+</div>
