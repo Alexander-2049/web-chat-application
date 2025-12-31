@@ -13,34 +13,26 @@ import { Subscription } from 'rxjs';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './rooms.component.html',
-  styleUrl: './rooms.component.scss',
+  styleUrls: ['./rooms.component.scss'],
 })
 export class RoomsComponent implements OnInit, OnDestroy {
-  // 🔥 signals
   wrapperDegAngle = signal(randomFloat(-1.5, 1.5));
   rooms = signal<Room[]>([]);
   isLoading = signal(true);
   errorMessage = signal('');
   showCreateRoomModal = signal(false);
 
-  searchForm = new FormGroup({
-    search: new FormControl(''),
-  });
+  search = signal('');
 
   createRoomForm = new FormGroup({
     roomName: new FormControl('', Validators.required),
     maxParticipants: new FormControl<number | null>(null),
   });
 
-  // 🔥 computed rooms list
   filteredRooms = computed(() => {
-    const search = this.searchForm.get('search')?.value?.toLowerCase() || '';
-
-    if (!search) {
-      return this.rooms();
-    }
-
-    return this.rooms().filter((room) => room.name.toLowerCase().includes(search));
+    const searchValue = this.search().toLowerCase();
+    if (!searchValue) return this.rooms();
+    return this.rooms().filter((room) => room.name.toLowerCase().includes(searchValue));
   });
 
   private subscriptions: Subscription[] = [];
@@ -61,25 +53,20 @@ export class RoomsComponent implements OnInit, OnDestroy {
         this.rooms.update((rooms) => rooms.filter((r) => r.roomId !== msg.data.roomId));
       });
 
-    const searchSub = this.searchForm.get('search')?.valueChanges.subscribe(() => {
-      /* computed сам пересчитается */
-    });
-
     const errorSub = this.wsService.getMessagesOfType<any>('error').subscribe((msg) => {
       console.error('[v0] Error from server:', msg.code);
       this.errorMessage.set(`Error: ${msg.code}`);
     });
 
-    this.subscriptions.push(
-      roomsSub,
-      roomDestroyedSub,
-      ...(searchSub ? [searchSub] : []),
-      errorSub
-    );
+    this.subscriptions.push(roomsSub, roomDestroyedSub, errorSub);
   }
 
   ngOnDestroy() {
     this.subscriptions.forEach((s) => s.unsubscribe());
+  }
+
+  onSearchInput(value: string) {
+    this.search.set(value);
   }
 
   openCreateRoomModal() {
@@ -99,14 +86,12 @@ export class RoomsComponent implements OnInit, OnDestroy {
     const roomName = this.createRoomForm.get('roomName')?.value;
     const maxParticipants = this.createRoomForm.get('maxParticipants')?.value;
 
-    if (!roomName?.trim()) {
-      return;
-    }
+    if (!roomName?.trim()) return;
 
     this.wsService.createRoom(roomName, maxParticipants || null);
 
     this.closeCreateRoomModal();
-    this.searchForm.get('search')?.setValue('');
+    this.search.set('');
 
     setTimeout(() => this.wsService.getAllRooms(), 500);
   }
@@ -115,5 +100,9 @@ export class RoomsComponent implements OnInit, OnDestroy {
     return room.maxClients
       ? `${room.connectedClientsAmount}/${room.maxClients}`
       : `${room.connectedClientsAmount}`;
+  }
+
+  trackByRoomId(index: number, room: Room): number {
+    return room.roomId;
   }
 }

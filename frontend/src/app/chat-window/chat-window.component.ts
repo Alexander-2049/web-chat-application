@@ -160,7 +160,6 @@ export class ChatWindowComponent implements OnInit {
       });
   }
 
-  // ✅ User Actions
   joinChatFromModal() {
     const nickname = this.nicknameForm.get('nickname')?.value;
     if (!nickname?.trim()) return;

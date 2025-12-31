@@ -2,14 +2,14 @@
   class="rooms-wrapper indie-flower-regular"
   [style.transform]="'rotate(' + wrapperDegAngle() + 'deg)'"
 >
-  <!-- Split search and create into separate controls -->
   <div class="header-controls">
-    <form [formGroup]="searchForm" class="search-form">
+    <form class="search-form">
       <input
-        formControlName="search"
         type="text"
         placeholder="Search rooms..."
         class="indie-flower-regular"
+        [value]="search()"
+        (input)="onSearchInput($event.target.value)"
       />
     </form>
 
@@ -38,7 +38,6 @@
   </ul>
 </div>
 
-<!-- Create room modal -->
 @if (showCreateRoomModal()) {
 <div class="modal-overlay" (click)="closeCreateRoomModal()">
   <div class="modal-paper indie-flower-regular" (click)="$event.stopPropagation()">
@@ -57,7 +56,7 @@
       </div>
 
       <div class="form-group">
-        <label for="maxParticipants"> Max Participants (optional) </label>
+        <label for="maxParticipants">Max Participants (optional)</label>
         <input
           id="maxParticipants"
           formControlName="maxParticipants"
@@ -76,7 +75,6 @@
         >
           Cancel
         </button>
-
         <button
           type="submit"
           class="create-btn indie-flower-regular"
