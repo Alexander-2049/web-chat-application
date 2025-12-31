@@ -1,7 +1,6 @@
 import express from "express";
 import http from "http";
 import path from "path";
-import cors from "cors";
 import { DatabaseFactory } from "./storage/DatabaseFactory";
 import { RoomRepository } from "./storage/RoomRepository";
 import { MessageRepository } from "./storage/MessageRepository";
@@ -19,12 +18,6 @@ process.on("SIGINT", () => {
 
 async function main() {
   const app = express();
-  app.use(
-    cors({
-      origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:4200",
-      credentials: true, // если нужны куки, токены и т.п.
-    })
-  );
   app.use(express.json());
 
   const server = http.createServer(app);
