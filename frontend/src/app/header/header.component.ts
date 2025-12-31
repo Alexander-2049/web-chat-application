@@ -15,7 +15,6 @@ import { WebSocketService } from '../services/websocket.service';
 export class HeaderComponent implements OnInit {
   constructor(private userService: UserService, private wsService: WebSocketService) {}
 
-  // 🔥 signals
   isUserConnected = signal(false);
   currentNickname = signal('');
   showSettingsModal = signal(false);
@@ -35,6 +34,11 @@ export class HeaderComponent implements OnInit {
       title: 'Rooms',
       path: 'rooms',
       icon: 'assets/open-door-icon.png',
+    },
+    {
+      title: 'Archive',
+      path: 'archive',
+      icon: 'assets/archive-icon.png',
     },
   ];
 
