@@ -102,6 +102,11 @@ export class RoomsComponent implements OnInit, OnDestroy {
       : `${room.connectedClientsAmount}`;
   }
 
+  isRoomFull(room: Room): boolean {
+    if (room.maxClients === null) return false;
+    return room.connectedClientsAmount >= room.maxClients;
+  }
+
   trackByRoomId(index: number, room: Room): number {
     return room.roomId;
   }

@@ -1,14 +1,48 @@
 <div class="archived-room-container">
   <div class="archived-paper indie-flower-regular">
-    <h1 class="title">Archived Room #{{ roomId() }}</h1>
-
-    <div class="info-box">
-      <p class="info-text">This feature is not yet available on the backend.</p>
-      <p class="info-text">
-        Once the backend supports viewing archived room messages, they will appear here.
-      </p>
+    @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <h2>Loading archived room...</h2>
+    </div>
+    } @else if (errorMessage()) {
+    <div class="error-state">
+      <h2>Error</h2>
+      <p class="error-text">{{ errorMessage() }}</p>
+      <button class="back-btn indie-flower-regular" (click)="goBack()">Back to Archive</button>
+    </div>
+    } @else if (roomData()) {
+    <div class="room-header">
+      <button class="back-btn-small indie-flower-regular" (click)="goBack()">← Back</button>
+      <h1 class="room-title">{{ roomData()!.name }}</h1>
+      <p class="room-meta">Archived on {{ formatDate(roomData()!.createdAt) }}</p>
     </div>
 
-    <button class="back-btn indie-flower-regular" (click)="goBack()">Back to Archive</button>
+    <div class="messages-container">
+      @if (messages().length === 0) {
+      <div class="empty-messages">
+        <p>No messages in this room</p>
+      </div>
+      } @else {
+      <div class="messages-list">
+        @for (msg of messages(); track msg.id; let i = $index) {
+        <div class="message-wrapper">
+          @if (shouldShowNickname(i)) {
+          <div class="message-nickname">{{ msg.nickname }}</div>
+          }
+          <div class="message-bubble">
+            <span class="message-content">{{ msg.content }}</span>
+            <span class="message-time">{{ formatTimestamp(msg.sentAt) }}</span>
+          </div>
+        </div>
+        }
+      </div>
+      }
+    </div>
+
+    <div class="footer-actions">
+      <button class="back-btn indie-flower-regular" (click)="goBack()">Back to Archive</button>
+    </div>
+    }
   </div>
 </div>

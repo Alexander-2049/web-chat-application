@@ -95,3 +95,105 @@ main {
     transform: rotate(360deg);
   }
 }
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(8px);
+}
+
+.modal-paper {
+  background-color: white;
+  border: 3px solid #2c2c2c;
+  box-shadow: 12px 12px 0 rgba(44, 44, 44, 0.3);
+  border-top-left-radius: 255px 15px;
+  border-top-right-radius: 15px 255px;
+  border-bottom-right-radius: 225px 15px;
+  border-bottom-left-radius: 15px 255px;
+  padding: 40px;
+  max-width: 550px;
+  width: 90%;
+  transform: rotate(-0.5deg);
+
+  &.duplicate-connection-modal {
+    border-color: #ff9800;
+
+    h2 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 36px;
+      text-align: center;
+      color: #ff9800;
+    }
+
+    .modal-icon {
+      font-size: 64px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .modal-description {
+      text-align: center;
+      font-size: 20px;
+      color: #2c2c2c;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .modal-description-secondary {
+      text-align: center;
+      font-size: 18px;
+      color: #666;
+      margin-bottom: 24px;
+      line-height: 1.5;
+      font-style: italic;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 24px;
+
+      button {
+        height: 48px;
+        padding: 8px 32px;
+        font-size: 24px;
+        font-family: inherit;
+        cursor: pointer;
+        border: 3px solid #2c2c2c;
+        transition: all 0.2s ease;
+        box-shadow: 4px 4px 0 rgba(44, 44, 44, 0.2);
+
+        border-top-left-radius: 190px 15px;
+        border-top-right-radius: 15px 285px;
+        border-bottom-right-radius: 215px 15px;
+        border-bottom-left-radius: 15px 205px;
+
+        &.refresh-btn {
+          background-color: #4a90e2;
+          color: white;
+
+          &:hover {
+            background-color: #357abd;
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.2);
+          }
+
+          &:active {
+            transform: translate(4px, 4px);
+            box-shadow: none;
+          }
+        }
+      }
+    }
+  }
+}

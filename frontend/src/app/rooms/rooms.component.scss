@@ -149,9 +149,15 @@
       border-bottom-right-radius: 215px 15px;
       border-bottom-left-radius: 15px 205px;
 
-      &:hover {
+      &:hover:not(.room-full) {
         scale: 1.02;
         filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.1));
+      }
+
+      &.room-full {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background-color: #f5f5f5;
       }
 
       a {
@@ -186,6 +192,41 @@
         &:hover {
           color: #000000;
           transform: scale(1.02);
+        }
+      }
+
+      .room-link-disabled {
+        display: flex;
+        width: 100%;
+        height: 48px;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 32px;
+        box-sizing: border-box;
+        gap: 16px;
+
+        font-family: inherit;
+        font-size: 28px;
+        color: #666;
+        text-decoration: none;
+        cursor: not-allowed;
+
+        .room-title {
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          font-family: inherit;
+          flex: 1;
+        }
+
+        .room-user-count {
+          text-wrap: nowrap;
+          flex-shrink: 0;
+
+          &.room-full-badge {
+            color: #d32f2f;
+            font-weight: bold;
+          }
         }
       }
     }

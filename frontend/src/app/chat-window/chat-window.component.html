@@ -113,3 +113,18 @@
     </form>
   </div>
 </div>
+
+<!-- Room Full Error Modal -->
+<div *ngIf="showRoomFullError()" class="modal-overlay">
+  <div class="modal-paper indie-flower-regular error-modal" (click)="$event.stopPropagation()">
+    <h2>Room is Full</h2>
+    <p class="modal-description">
+      This room has reached its maximum capacity. Please try another room.
+    </p>
+    <div class="modal-buttons">
+      <button type="button" class="join-btn indie-flower-regular" (click)="goBackToRooms()">
+        Back to Rooms
+      </button>
+    </div>
+  </div>
+</div>

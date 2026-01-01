@@ -9,7 +9,7 @@
         placeholder="Search rooms..."
         class="indie-flower-regular"
         [value]="search()"
-        (input)="onSearchInput($event.target.value)"
+        (input)="onSearchInput($any($event.target).value)"
       />
     </form>
 
@@ -26,13 +26,26 @@
 
   <ul class="rooms-list">
     @for (item of filteredRooms(); track item.roomId; let i = $index) {
-    <li [style.transform]="'rotate(' + (i % 2 === 0 ? -0.25 : 0.25) + 'deg)'">
+    <!-- Make full rooms inactive/unclickable -->
+    <li
+      [style.transform]="'rotate(' + (i % 2 === 0 ? -0.25 : 0.25) + 'deg)'"
+      [class.room-full]="isRoomFull(item)"
+    >
+      @if (isRoomFull(item)) {
+      <div class="room-link-disabled">
+        <span class="room-title">{{ item.name }}</span>
+        <span class="room-user-count room-full-badge">
+          {{ getRoomParticipants(item) }} (Full)
+        </span>
+      </div>
+      } @else {
       <a [routerLink]="'/rooms/' + item.roomId">
         <span class="room-title">{{ item.name }}</span>
         <span class="room-user-count">
           {{ getRoomParticipants(item) }}
         </span>
       </a>
+      }
     </li>
     }
   </ul>

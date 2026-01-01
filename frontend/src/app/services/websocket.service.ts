@@ -130,6 +130,14 @@ export class WebSocketService {
     this.send({ type: 'createRoom', name, maxParticipants });
   }
 
+  leaveRoom(roomId: number): void {
+    this.send({ type: 'leaveRoom', roomId });
+  }
+
+  getArchivedRoom(roomId: number): void {
+    this.send({ type: 'getArchivedRoom', roomId });
+  }
+
   // Helper methods to filter messages by type
   getMessagesOfType<T extends WSMessage>(type: string): Observable<T> {
     return new Observable((observer) => {

@@ -39,6 +39,7 @@ export class ChatWindowComponent implements OnInit {
   readonly roomData = signal<any>(null);
   readonly connectedClients = signal<{ id: string; nickname: string }[]>([]);
   readonly isWideScreen = signal(window.innerWidth > 1400);
+  readonly showRoomFullError = signal(false);
 
   readonly nicknameForm = new FormGroup({
     nickname: new FormControl('', Validators.required),
@@ -106,6 +107,13 @@ export class ChatWindowComponent implements OnInit {
     });
 
     this.registerWebSocketListeners();
+
+    this.router.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((event) => {
+      if (event.constructor.name === 'NavigationStart' && this.roomId !== null) {
+        // User is navigating away, send leaveRoom message
+        this.wsService.leaveRoom(this.roomId);
+      }
+    });
   }
 
   private registerWebSocketListeners() {
@@ -167,6 +175,17 @@ export class ChatWindowComponent implements OnInit {
           this.router.navigate(['/rooms']);
         } else if (msg.code === 'NICKNAME_REQUIRED') {
           this.showNicknameModal.set(true);
+        } else if (msg.code === 'ROOM_FULL') {
+          this.showRoomFullError.set(true);
+        }
+      });
+
+    this.wsService
+      .getMessagesOfType<any>('success')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((msg) => {
+        if (msg.code === 'ROOM_LEFT') {
+          console.log('[v0] Successfully left room:', msg.data?.roomId);
         }
       });
   }
@@ -202,6 +221,10 @@ export class ChatWindowComponent implements OnInit {
   }
 
   goToRoomsList() {
+    this.router.navigate(['/rooms']);
+  }
+
+  goBackToRooms() {
     this.router.navigate(['/rooms']);
   }
 

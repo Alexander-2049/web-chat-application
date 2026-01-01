@@ -20,6 +20,35 @@
 </div>
 }
 
+<!-- Added duplicate connection error modal -->
+@if (showDuplicateConnectionError()) {
+<div class="modal-overlay">
+  <div
+    class="modal-paper indie-flower-regular duplicate-connection-modal"
+    (click)="$event.stopPropagation()"
+  >
+    <h2>Duplicate Connection Detected</h2>
+    <div class="modal-icon">⚠️</div>
+    <p class="modal-description">
+      You have an active connection in another browser tab or window. Only one connection per
+      account is allowed at a time.
+    </p>
+    <p class="modal-description-secondary">
+      Please close the other tab or refresh this page to reconnect.
+    </p>
+    <div class="modal-buttons">
+      <button
+        type="button"
+        class="refresh-btn indie-flower-regular"
+        (click)="window.location.reload()"
+      >
+        Refresh Page
+      </button>
+    </div>
+  </div>
+</div>
+}
+
 <!-- Show main app only when connected -->
 @if (isConnected()) {
 <main class="main">

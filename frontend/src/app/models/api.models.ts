@@ -83,6 +83,16 @@ export interface WSCreateRoomMessage {
   maxParticipants: number | null;
 }
 
+export interface WSLeaveRoomMessage {
+  type: 'leaveRoom';
+  roomId: number;
+}
+
+export interface WSGetArchivedRoomMessage {
+  type: 'getArchivedRoom';
+  roomId: number;
+}
+
 // Incoming messages (server -> client)
 export interface WSUserIdIssuedMessage {
   type: 'userIdIssued';
@@ -172,7 +182,28 @@ export interface WSErrorMessage {
   code: string;
 }
 
+export interface WSArchivedRoomDataMessage {
+  type: 'archivedRoomData';
+  data: {
+    room: {
+      roomId: number;
+      name: string;
+      creatorUserId: string;
+      createdAt: string;
+      archived: true;
+    };
+    messages: {
+      id: number;
+      userId: string;
+      nickname: string;
+      content: string;
+      sentAt: string;
+    }[];
+  };
+}
+
 export interface WSSuccessMessage {
   type: 'success';
   code: string;
+  data?: any;
 }

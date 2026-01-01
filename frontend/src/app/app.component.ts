@@ -19,6 +19,9 @@ export class AppComponent implements OnInit, OnDestroy {
   isConnecting = signal(true);
   isConnected = signal(false);
   connectionError = signal('');
+  showDuplicateConnectionError = signal(false);
+
+  window = window;
 
   private subscriptions: Subscription[] = [];
   private initialUrl = '';
@@ -32,6 +35,14 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit() {
+    const closedSub = this.wsService.getMessagesOfType<any>('closed').subscribe((msg) => {
+      if (msg.code === 'DUBLICATE_CONNECTION') {
+        this.showDuplicateConnectionError.set(true);
+      }
+    });
+
+    this.subscriptions.push(closedSub);
+
     try {
       let userId = this.userService.getUserId();
 
