@@ -226,6 +226,68 @@ export class ChatServer {
         );
         break;
 
+      case "getArchivedRoom": {
+        const { roomId } = msg;
+
+        if (typeof roomId !== "number") {
+          return this.send(
+            conn.ws,
+            new WebsocketMessage({
+              type: "error",
+              code: "INVALID_ROOM_ID",
+            })
+          );
+        }
+
+        const room = this.roomRepo.findById(roomId);
+        if (!room) {
+          return this.send(
+            conn.ws,
+            new WebsocketMessage({
+              type: "error",
+              code: "ROOM_NOT_FOUND",
+            })
+          );
+        }
+
+        if (!room.archived) {
+          return this.send(
+            conn.ws,
+            new WebsocketMessage({
+              type: "error",
+              code: "ROOM_NOT_ARCHIVED",
+            })
+          );
+        }
+
+        const messages = this.msgRepo.findAllByRoom(roomId);
+
+        this.send(
+          conn.ws,
+          new WebsocketMessage({
+            type: "archivedRoomData",
+            data: {
+              room: {
+                roomId: room.id,
+                name: room.name,
+                creatorUserId: room.creatorUserId,
+                createdAt: room.createdAt,
+                archived: room.archived,
+              },
+              messages: messages.map((m) => ({
+                id: m.messageId!,
+                userId: m.userId,
+                nickname: m.nickname,
+                content: m.content,
+                sentAt: m.sentAt,
+              })),
+            },
+          })
+        );
+
+        break;
+      }
+
       case "joinRoom": {
         const { roomId, nickname } = msg;
 
@@ -289,6 +351,49 @@ export class ChatServer {
         this.touchRoom(roomId);
         this.streamRoomStateToParticipants(roomId);
         this.streamAllRoomsToAllConnectedClients();
+        break;
+      }
+
+      case "leaveRoom": {
+        const roomId = conn.roomId;
+
+        if (roomId === null) {
+          return this.send(
+            conn.ws,
+            new WebsocketMessage({
+              type: "error",
+              code: "NOT_IN_ROOM",
+            })
+          );
+        }
+
+        const participants = this.roomConnectedClients.get(roomId);
+        if (participants) {
+          participants.delete(conn.userId);
+
+          // If room becomes empty, keep it alive until TTL cleanup
+          if (participants.size === 0) {
+            this.roomConnectedClients.delete(roomId);
+          } else {
+            this.streamRoomStateToParticipants(roomId);
+          }
+        }
+
+        conn.roomId = null;
+        conn.nicknames.delete(roomId);
+
+        this.touchRoom(roomId);
+        this.streamAllRoomsToAllConnectedClients();
+
+        this.send(
+          conn.ws,
+          new WebsocketMessage({
+            type: "success",
+            code: "ROOM_LEFT",
+            data: { roomId },
+          })
+        );
+
         break;
       }
 

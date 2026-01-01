@@ -67,6 +67,26 @@ export interface WSAllArchivedRoomsMessage {
   };
 }
 
+export interface WSArchivedRoomDataMessage {
+  type: "archivedRoomData";
+  data: {
+    room: {
+      roomId: number;
+      name: string;
+      creatorUserId: string;
+      createdAt: string;
+      archived: true;
+    };
+    messages: {
+      id: number;
+      userId: string;
+      nickname: string;
+      content: string;
+      sentAt: string;
+    }[];
+  };
+}
+
 export interface WSRoomDestroyedMessage {
   type: "roomDestroyed";
   data: {
@@ -100,6 +120,7 @@ export type WSOutgoingMessage =
   | WSRoomConnectedClientsMessage
   | WSAllActiveRoomsMessage
   | WSAllArchivedRoomsMessage
+  | WSArchivedRoomDataMessage
   | WSRoomDestroyedMessage
   | WSClosedMessage
   | WSChatMessage;
