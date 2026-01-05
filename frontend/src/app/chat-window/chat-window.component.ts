@@ -12,7 +12,7 @@ import {
   inject,
 } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, NavigationStart, Router } from '@angular/router';
 import { randomFloat } from '../utils/random';
 import { Message } from '../models/api.models';
 import { WebSocketService } from '../services/websocket.service';
@@ -109,7 +109,7 @@ export class ChatWindowComponent implements OnInit {
     this.registerWebSocketListeners();
 
     this.router.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((event) => {
-      if (event.constructor.name === 'NavigationStart' && this.roomId !== null) {
+      if (event instanceof NavigationStart && this.roomId !== null) {
         // User is navigating away, send leaveRoom message
         this.wsService.leaveRoom(this.roomId);
       }
