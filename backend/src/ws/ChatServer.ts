@@ -32,7 +32,7 @@ export class ChatServer {
     private server: HttpServer,
     private roomRepo: RoomRepository,
     private msgRepo: MessageRepository,
-    private chatLifeDurationSeconds: number = 120
+    private chatLifeDurationSeconds: number = 10 * 60 // 1 minutes
   ) {}
 
   setup() {
